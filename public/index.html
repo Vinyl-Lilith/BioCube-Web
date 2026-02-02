@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioCube Controller</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root { --primary: #00ff88; --bg: #121212; --panel: #1e1e1e; --text: #eee; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 0; }
+        
+        /* Layout */
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .hidden { display: none !important; }
+        
+        /* Auth Screen */
+        #auth-screen { display: flex; height: 100vh; justify-content: center; align-items: center; flex-direction: column; }
+        input { padding: 10px; margin: 5px; background: #333; border: 1px solid #555; color: white; width: 250px; }
+        button { padding: 10px 20px; background: var(--primary); border: none; font-weight: bold; cursor: pointer; color: #000; }
+        
+        /* App Layout */
+        nav { background: var(--panel); padding: 15px; display: flex; justify-content: space-between; align-items: center; }
+        .nav-links button { background: transparent; color: white; margin-left: 10px; }
+        .nav-links button.active { border-bottom: 2px solid var(--primary); }
+        
+        /* Dashboard Grid */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px; }
+        .card { background: var(--panel); padding: 20px; border-radius: 10px; }
+        
+        /* Camera */
+        #cam-feed { width: 100%; border-radius: 8px; transform: rotate(180deg); cursor: pointer; border: 2px solid #333; }
+        #cam-feed.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 999; object-fit: contain; background: black; transform: rotate(180deg); }
+        
+        /* Status Indicators */
+        .status-dot { height: 10px; width: 10px; background-color: red; border-radius: 50%; display: inline-block; }
+        .online { background-color: var(--primary); }
+        
+        /* Manual Controls */
+        .control-group { margin: 10px 0; display: flex; justify-content: space-between; align-items: center; }
+        .toggle { cursor: pointer; padding: 5px 10px; background: #555; }
+        .toggle.on { background: var(--primary); color: black; }
+        .disabled { opacity: 0.5; pointer-events: none; }
+
+        /* Admin Table */
+        table { width: 100%; border-collapse: collapse; }
+        td, th { padding: 8px; text-align: left; border-bottom: 1px solid #333; }
+    </style>
+</head>
+<body>
+
+    <div id="auth-screen">
+        <h1>BioCube</h1>
+        <input type="text" id="username" placeholder="Username">
+        <input type="password" id="password" placeholder="Password">
+        <div style="margin-top: 10px;">
+            <button onclick="auth('login')">Log In</button>
+            <button onclick="auth('register')">Sign Up</button>
+        </div>
+        <p id="auth-msg"></p>
+    </div>
+
+    <div id="app-screen" class="hidden">
+        <nav>
+            <div style="display:flex; align-items:center; gap:10px;">
+                <h2>BioCube</h2>
+                <small>Pi: <span id="pi-status" class="status-dot"></span></small>
+            </div>
+            <div class="nav-links">
+                <button onclick="nav('home')">Home</button>
+                <button onclick="nav('manual')">Manual</button>
+                <button onclick="nav('settings')">Settings</button>
+                <button id="btn-admin" class="hidden" onclick="nav('admin')">Admin</button>
+                <button onclick="logout()">Log Out</button>
+            </div>
+        </nav>
+
+        <div class="container">
+            
+            <div id="page-home">
+                <div class="grid">
+                    <div class="card">
+                        <h3>Live Feed (Tap to enlarge)</h3>
+                        <img id="cam-feed" src="" alt="Waiting for stream..." ondblclick="toggleFullCam()">
+                    </div>
+                    <div class="card">
+                        <h3>Live Sensors</h3>
+                        <p>Temperature: <span id="val-temp">--</span> °C</p>
+                        <p>Humidity: <span id="val-hum">--</span> %</p>
+                        <p>Soil Moisture: <span id="val-soil">--</span> %</p>
+                        <p>NPK: <span id="val-npk">-- - -- - --</span></p>
+                        <p>System Mode: <strong id="sys-mode">AUTO</strong></p>
+                    </div>
+                    <div class="card" style="grid-column: span 2;">
+                        <h3>24h Trend</h3>
+                        <canvas id="sensorChart"></canvas>
+                        <br>
+                        <button onclick="window.open('/api/download/standard')">Download Standard Excel</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-manual" class="hidden">
+                <div class="card">
+                    <h3>Manual Controls</h3>
+                    <p style="color: yellow;">⚠️ WARNING: Turn OFF Auto Mode in settings to enable manual controls.</p>
+                    <div id="manual-controls" class="disabled">
+                        <div class="control-group">
+                            <span>Water Pump</span>
+                            <button class="toggle" onclick="toggleActuator('water', this)">OFF</button>
+                        </div>
+                        <div class="control-group">
+                            <span>Nutrient Pump</span>
+                            <button class="toggle" onclick="toggleActuator('nutrient', this)">OFF</button>
+                        </div>
+                        <div class="control-group">
+                            <span>Exhaust Fan</span>
+                            <button class="toggle" onclick="toggleActuator('exhaust', this)">OFF</button>
+                        </div>
+                        <div class="control-group">
+                            <span>Cooling (Peltier+Fans)</span>
+                            <button class="toggle" onclick="toggleActuator('cool', this)">OFF</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-settings" class="hidden">
+                <div class="card">
+                    <h3>Automation Settings</h3>
+                    <div class="control-group">
+                        <span>Auto Mode</span>
+                        <button id="btn-auto" class="toggle on" onclick="toggleAuto()">ON</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-admin" class="hidden">
+                <div class="card">
+                    <h3>User Management</h3>
+                    <table id="user-table">
+                        <tr><th>Username</th><th>Role</th><th>Status</th><th>Action</th></tr>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        const socket = io(); // Connects to the Render backend automatically
+        let currentUser = null;
+        let isAuto = true;
+
+        // --- AUTH ---
+        async function auth(type) {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const res = await fetch(`/api/${type}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const data = await res.json();
+            if(data.status === 'ok') {
+                if(type === 'login') {
+                    localStorage.setItem('token', data.token);
+                    currentUser = { role: data.role };
+                    loadApp();
+                } else {
+                    alert('Registered! Now Log In.');
+                }
+            } else {
+                document.getElementById('auth-msg').innerText = data.error;
+            }
+        }
+
+        function loadApp() {
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-screen').classList.remove('hidden');
+            if(currentUser && currentUser.role === 'admin') {
+                document.getElementById('btn-admin').classList.remove('hidden');
+                loadUsers();
+            }
+        }
+        
+        function logout() {
+            localStorage.removeItem('token');
+            location.reload();
+        }
+
+        // --- NAVIGATION ---
+        function nav(page) {
+            document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`page-${page}`).classList.remove('hidden');
+        }
+
+        // --- SOCKET DATA ---
+        socket.on('feed', (data) => {
+            document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data;
+        });
+
+        socket.on('pi_status', () => {
+            document.getElementById('pi-status').classList.add('online');
+        });
+
+        socket.on('update', (data) => {
+            document.getElementById('val-temp').innerText = data.temp_in.toFixed(1);
+            document.getElementById('val-hum').innerText = data.hum_in.toFixed(1);
+            document.getElementById('val-soil').innerText = data.soil_moisture;
+            document.getElementById('val-npk').innerText = `${data.npk_n}-${data.npk_p}-${data.npk_k}`;
+            
+            // Sync Auto Mode State
+            isAuto = data.auto_mode;
+            document.getElementById('sys-mode').innerText = isAuto ? "AUTO" : "MANUAL";
+            
+            const autoBtn = document.getElementById('btn-auto');
+            if(isAuto) autoBtn.classList.add('on'); else autoBtn.classList.remove('on');
+            autoBtn.innerText = isAuto ? "ON" : "OFF";
+
+            // Enable/Disable Manual Controls
+            const manualDiv = document.getElementById('manual-controls');
+            if(isAuto) manualDiv.classList.add('disabled');
+            else manualDiv.classList.remove('disabled');
+
+            updateChart(data);
+        });
+
+        // --- CONTROLS ---
+        function toggleFullCam() {
+            document.getElementById('cam-feed').classList.toggle('fullscreen');
+        }
+
+        function toggleAuto() {
+            const newState = !isAuto;
+            socket.emit('control_cmd', { cmd: 'set_auto', val: newState });
+        }
+
+        function toggleActuator(name, btn) {
+            const turnOn = btn.innerText === "OFF";
+            socket.emit('control_cmd', { cmd: name, val: turnOn });
+            btn.innerText = turnOn ? "ON" : "OFF";
+            btn.classList.toggle('on');
+        }
+
+        // --- ADMIN ---
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            const table = document.getElementById('user-table');
+            table.innerHTML = '<tr><th>Username</th><th>Role</th><th>Status</th><th>Action</th></tr>';
+            users.forEach(u => {
+                const row = `<tr>
+                    <td>${u.username}</td>
+                    <td>${u.role}</td>
+                    <td>${u.isBanned ? 'Banned' : 'Active'}</td>
+                    <td>
+                        <button onclick="adminAction('${u.username}', 'ban')">Ban</button>
+                        <button onclick="adminAction('${u.username}', 'promote')">Promote</button>
+                    </td>
+                </tr>`;
+                table.innerHTML += row;
+            });
+        }
+
+        async function adminAction(user, action) {
+            await fetch('/api/admin/action', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({targetUser: user, action})
+            });
+            loadUsers();
+        }
+
+        // --- CHARTS ---
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{ label: 'Temp', data: [], borderColor: 'red' }, { label: 'Moisture', data: [], borderColor: 'blue' }]
+            }
+        });
+
+        function updateChart(data) {
+            const time = new Date().toLocaleTimeString();
+            if(chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[1].data.shift();
+            }
+            chart.data.labels.push(time);
+            chart.data.datasets[0].data.push(data.temp_in);
+            chart.data.datasets[1].data.push(data.soil_moisture);
+            chart.update();
+        }
+    </script>
+</body>
+</html>
