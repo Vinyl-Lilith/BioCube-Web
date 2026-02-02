@@ -78,12 +78,10 @@
             margin-bottom: 15px; display: flex; justify-content: space-between;
         }
 
-        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-        #cam-feed { width: 100%; display: block; transform: rotate(180deg); transition: 0.3s; }
-        #cam-feed.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; object-fit: contain; background: #000; }
-
+        /* --- SENSOR DISPLAY --- */
         .sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(4, 1fr); } }
+        @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(3, 1fr); } }
+        
         .sensor-module { 
             background: rgba(255,255,255,0.03); padding: 15px; text-align: center; 
             border: 1px solid rgba(255,255,255,0.05); transition: 0.3s;
@@ -91,6 +89,11 @@
         .sensor-module:hover { border-color: var(--cyber-blue); }
         .sensor-module .val { font-size: 2.2rem; font-weight: 700; color: #fff; line-height: 1; }
         .sensor-module label { font-size: 0.7rem; color: var(--cyber-blue); text-transform: uppercase; display: block; margin-bottom: 5px; }
+        
+        .npk-box { border-left: 2px solid var(--acid-green); }
+
+        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        #cam-feed { width: 100%; display: block; transform: rotate(180deg); }
 
         .btn-master {
             width: 100%; padding: 15px; font-family: 'Orbitron'; font-weight: bold;
@@ -107,7 +110,6 @@
         .hidden { display: none !important; }
         .disabled { opacity: 0.2; pointer-events: none; }
         
-        .admin-table-container { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         th { color: var(--cyber-blue); text-align: left; padding: 12px; border-bottom: 2px solid #222; }
         td { padding: 12px; border-bottom: 1px solid #111; }
@@ -146,7 +148,7 @@
                         <span id="pi-status-tag" style="color:var(--danger-red)">● LINK_DOWN</span>
                     </div>
                     <div class="cam-wrapper">
-                        <img id="cam-feed" src="" alt="SIGNAL LOST" ondblclick="toggleFullCam()">
+                        <img id="cam-feed" src="" alt="SIGNAL LOST">
                     </div>
                 </div>
 
@@ -154,16 +156,18 @@
                     <div class="sensor-module"><label>Temp</label><div class="val" id="v-temp">--</div><span>°C</span></div>
                     <div class="sensor-module"><label>Humid</label><div class="val" id="v-hum">--</div><span>%</span></div>
                     <div class="sensor-module"><label>Soil</label><div class="val" id="v-soil">--</div><span>%</span></div>
-                    <div class="sensor-module"><label>NPK (N-P-K)</label><div class="val" id="v-npk" style="font-size:1.1rem">--</div></div>
+                    <div class="sensor-module npk-box"><label>Nitrogen (N)</label><div class="val" id="v-n">--</div><span>mg/kg</span></div>
+                    <div class="sensor-module npk-box"><label>Phosphorus (P)</label><div class="val" id="v-p">--</div><span>mg/kg</span></div>
+                    <div class="sensor-module npk-box"><label>Potassium (K)</label><div class="val" id="v-k">--</div><span>mg/kg</span></div>
                 </div>
 
                 <div class="hud-card" style="margin-top:20px;">
-                    <div class="hud-header">24H_DATA_TREND</div>
-                    <canvas id="sensorChart" style="max-height: 250px;"></canvas>
-                    <div style="display: flex; gap: 10px;">
-                        <button class="btn-master off" style="margin-top:15px; font-size:0.7rem;" onclick="window.open('/api/download/standard')">CSV LOGS</button>
-                        <button class="btn-master off" style="margin-top:15px; font-size:0.7rem;" onclick="window.open('/api/download/academic')">RAW JSON</button>
+                    <div class="hud-header">DATA_EXPORT_CENTER</div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button class="btn-master off" style="font-size: 0.7rem;" onclick="window.open('/api/download/standard')">MASTER CSV (EXCEL)</button>
+                        <button class="btn-master off" style="font-size: 0.7rem;" onclick="window.open('/api/download/academic')">DETAILED CSV (PRO)</button>
                     </div>
+                    <canvas id="sensorChart" style="max-height: 200px; margin-top:20px;"></canvas>
                 </div>
             </div>
 
@@ -182,41 +186,32 @@
 
             <div id="page-settings" class="hidden">
                 <div class="hud-card">
-                    <div class="hud-header">SYSTEM_THRESHOLDS</div>
+                    <div class="hud-header">SYSTEM_LOGIC_CONFIGURATION</div>
                     <div class="toggle-row" style="margin-bottom:20px;">
-                        <span>AUTO MODE</span>
+                        <span>AUTOMATION ENGINE</span>
                         <button id="btn-auto-toggle" class="btn-toggle" onclick="toggleAuto()">OFF</button>
                     </div>
                     
-                    <div class="input-group">
-                        <div class="toggle-row">
-                            <span>Cooling Trigger (Temp > X°C)</span>
-                            <input type="number" id="th-temp" value="28" style="width:60px;">
-                        </div>
-                        <div class="toggle-row">
-                            <span>Exhaust Trigger (Humid > X%)</span>
-                            <input type="number" id="th-hum" value="70" style="width:60px;">
-                        </div>
-                        <div class="toggle-row">
-                            <span>Watering Trigger (Soil < X%)</span>
-                            <input type="number" id="th-soil" value="30" style="width:60px;">
-                        </div>
-                        <button class="btn-master on" onclick="updateThresholds()">SYNC TO BIOCUBE</button>
-                    </div>
+                    <div class="toggle-row"><span>Cooling Trigger (Temp > X)</span><input type="number" id="th-temp" value="28" style="width:60px; background:#000; border:1px solid #444; color:cyan; padding:5px;"></div>
+                    <div class="toggle-row"><span>Exhaust Trigger (Humid > X)</span><input type="number" id="th-hum" value="70" style="width:60px; background:#000; border:1px solid #444; color:cyan; padding:5px;"></div>
+                    <div class="toggle-row"><span>Watering Trigger (Soil < X)</span><input type="number" id="th-soil" value="30" style="width:60px; background:#000; border:1px solid #444; color:cyan; padding:5px;"></div>
+                    
+                    <h3 style="color:var(--acid-green); font-size:0.8rem; margin-top:20px;">NUTRIENT THRESHOLDS (NPK mg/kg)</h3>
+                    <div class="toggle-row"><span>N-Min Target</span><input type="number" id="th-n" value="50" style="width:60px; background:#000; border:1px solid #444; color:cyan; padding:5px;"></div>
+                    <div class="toggle-row"><span>P-Min Target</span><input type="number" id="th-p" value="30" style="width:60px; background:#000; border:1px solid #444; color:cyan; padding:5px;"></div>
+                    <div class="toggle-row"><span>K-Min Target</span><input type="number" id="th-k" value="40" style="width:60px; background:#000; border:1px solid #444; color:cyan; padding:5px;"></div>
+
+                    <button class="btn-master on" onclick="updateThresholds()">SYNC ALL THRESHOLDS</button>
                 </div>
             </div>
 
             <div id="page-admin" class="hidden">
                 <div class="hud-card">
                     <div class="hud-header">OPERATOR_MANAGEMENT</div>
-                    <div class="admin-table-container">
-                        <table>
-                            <thead>
-                                <tr><th>USER</th><th>ROLE</th><th>PERMS</th><th>ACTION</th></tr>
-                            </thead>
-                            <tbody id="admin-user-list"></tbody>
-                        </table>
-                    </div>
+                    <table>
+                        <thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+                        <tbody id="admin-user-list"></tbody>
+                    </table>
                 </div>
             </div>
 
@@ -228,11 +223,11 @@
         let isAuto = true;
         let myRole = 'operator';
 
-        // --- AUTHENTICATION ---
+        // --- AUTH LOGIC ---
         async function handleAuth(type) {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
-            if(!u || !p) return alert("Credentials Required");
+            if(!u || !p) return alert("CREDENTIALS REQUIRED");
 
             const res = await fetch(`/api/${type}`, {
                 method: 'POST',
@@ -245,18 +240,24 @@
                 if(type === 'login') {
                     localStorage.setItem('token', data.token);
                     myRole = data.role;
+
+                    // TRIPLE CHECK: Admin Override
+                    if(u.toLowerCase() === 'admin') myRole = 'admin';
+
                     document.getElementById('auth-screen').classList.add('hidden');
                     document.getElementById('app-screen').classList.remove('hidden');
-                    if(myRole === 'admin') document.getElementById('btn-admin-nav').classList.remove('hidden');
+                    
+                    if(myRole === 'admin') {
+                        document.getElementById('btn-admin-nav').classList.remove('hidden');
+                    }
+                    initChart();
                 } else {
-                    alert("Registration Successful. Please Initialize.");
+                    alert("OPERATOR REGISTERED. PLEASE INITIALIZE.");
                 }
             } else {
                 document.getElementById('auth-msg').innerText = data.error.toUpperCase();
             }
         }
-
-        function logout() { localStorage.removeItem('token'); location.reload(); }
 
         // --- NAVIGATION ---
         function nav(page, btn) {
@@ -267,42 +268,45 @@
             if(page === 'admin') loadAdminData();
         }
 
-        // --- SOCKETS ---
-        socket.on('feed', (data) => { document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data; });
-        
-        socket.on('pi_status', (data) => {
-            const tag = document.getElementById('pi-status-tag');
-            if(data.online) {
-                tag.innerText = "● LINK_ACTIVE"; tag.style.color = "var(--acid-green)";
-            } else {
-                tag.innerText = "● LINK_DOWN"; tag.style.color = "var(--danger-red)";
-            }
-        });
-
+        // --- SOCKETS & DATA ---
         socket.on('update', (data) => {
-            document.getElementById('v-temp').innerText = data.temp_in ? data.temp_in.toFixed(1) : "--";
-            document.getElementById('v-hum').innerText = data.hum_in ? data.hum_in.toFixed(1) : "--";
+            document.getElementById('v-temp').innerText = data.temp_in?.toFixed(1) || "--";
+            document.getElementById('v-hum').innerText = data.hum_in?.toFixed(1) || "--";
             document.getElementById('v-soil').innerText = data.soil_moisture || "--";
-            document.getElementById('v-npk').innerText = `${data.npk_n || 0}-${data.npk_p || 0}-${data.npk_k || 0}`;
+            
+            // Individual NPK updates
+            document.getElementById('v-n').innerText = data.npk_n || "0";
+            document.getElementById('v-p').innerText = data.npk_p || "0";
+            document.getElementById('v-k').innerText = data.npk_k || "0";
             
             isAuto = data.auto_mode;
             const autoBtn = document.getElementById('btn-auto-toggle');
-            const manualDiv = document.getElementById('manual-controls');
-            const lockMsg = document.getElementById('manual-lock-msg');
-
             autoBtn.innerText = isAuto ? "ON" : "OFF";
             autoBtn.className = isAuto ? "btn-toggle active" : "btn-toggle";
             
+            const manualDiv = document.getElementById('manual-controls');
+            const lockMsg = document.getElementById('manual-lock-msg');
             if(isAuto) { manualDiv.classList.add('disabled'); lockMsg.classList.remove('hidden'); }
             else { manualDiv.classList.remove('disabled'); lockMsg.classList.add('hidden'); }
-            
+
             updateChart(data);
         });
 
-        // --- CONTROLS & THRESHOLDS ---
-        function toggleFullCam() { document.getElementById('cam-feed').classList.toggle('fullscreen'); }
-        function toggleAuto() { socket.emit('control_cmd', { cmd: 'set_auto', val: !isAuto }); }
-        
+        socket.on('feed', (data) => {
+            document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data;
+        });
+
+        socket.on('pi_status', (data) => {
+            const tag = document.getElementById('pi-status-tag');
+            tag.innerText = data.online ? "● LINK_ACTIVE" : "● LINK_DOWN";
+            tag.style.color = data.online ? "var(--acid-green)" : "var(--danger-red)";
+        });
+
+        // --- HARDWARE CONTROLS ---
+        function toggleAuto() {
+            socket.emit('control_cmd', { cmd: 'set_auto', val: !isAuto });
+        }
+
         function toggleActuator(name, btn) {
             const turnOn = btn.innerText === "OFF";
             socket.emit('control_cmd', { cmd: name, val: turnOn });
@@ -311,20 +315,19 @@
         }
 
         function updateThresholds() {
-            const t = parseInt(document.getElementById('th-temp').value);
-            const h = parseInt(document.getElementById('th-hum').value); // EXHAUST THRESHOLD
-            const s = parseInt(document.getElementById('th-soil').value);
-            
-            if(isNaN(t) || isNaN(h) || isNaN(s)) return alert("INVALID DATA");
-            
-            socket.emit('control_cmd', { 
-                cmd: 'update_thresholds', 
-                val: { temp: t, humid: h, soil: s } 
-            });
-            alert("THRESHOLDS SYNCED TO CORE");
+            const vals = {
+                temp: parseInt(document.getElementById('th-temp').value),
+                humid: parseInt(document.getElementById('th-hum').value),
+                soil: parseInt(document.getElementById('th-soil').value),
+                n: parseInt(document.getElementById('th-n').value),
+                p: parseInt(document.getElementById('th-p').value),
+                k: parseInt(document.getElementById('th-k').value)
+            };
+            socket.emit('control_cmd', { cmd: 'update_thresholds', val: vals });
+            alert("BIOCUBE LOGIC UPDATED");
         }
 
-        // --- ADMIN MANAGEMENT ---
+        // --- ADMIN FUNCTIONS ---
         async function loadAdminData() {
             const res = await fetch('/api/users');
             const users = await res.json();
@@ -334,7 +337,7 @@
                 tbody.innerHTML += `<tr>
                     <td>${u.username}</td>
                     <td>${u.role}</td>
-                    <td>M:${u.canManual ? 'Y' : 'N'} | A:${u.canEditAuto ? 'Y' : 'N'}</td>
+                    <td>${u.isBanned ? 'BANNED' : 'ACTIVE'}</td>
                     <td>
                         <button onclick="adminAction('${u.username}', 'ban')" style="color:red; background:none; border:none; cursor:pointer;">BAN</button>
                         <button onclick="adminAction('${u.username}', 'promote')" style="color:cyan; background:none; border:none; cursor:pointer;">PRO</button>
@@ -345,7 +348,7 @@
         }
 
         async function adminAction(targetUser, action) {
-            if(!confirm(`Confirm ${action} on ${targetUser}?`)) return;
+            if(!confirm(`CONFIRM ${action.toUpperCase()} ON ${targetUser}?`)) return;
             await fetch('/api/admin/action', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -354,40 +357,43 @@
             loadAdminData();
         }
 
-        // --- CHARTING ---
-        const ctx = document.getElementById('sensorChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: [],
-                datasets: [
-                    { label: 'Temp', data: [], borderColor: '#00f2ff', tension: 0.4, pointRadius: 0 },
-                    { label: 'Soil', data: [], borderColor: '#bfff00', tension: 0.4, pointRadius: 0 }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: { 
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666' } }, 
-                    x: { grid: { display: false }, ticks: { display: false } } 
+        // --- CHARTING ENGINE ---
+        let sensorChart;
+        function initChart() {
+            const ctx = document.getElementById('sensorChart').getContext('2d');
+            sensorChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { label: 'Temp', data: [], borderColor: '#00f2ff', tension: 0.4, pointRadius: 0 },
+                        { label: 'Soil', data: [], borderColor: '#bfff00', tension: 0.4, pointRadius: 0 }
+                    ]
                 },
-                plugins: { legend: { labels: { color: '#fff', font: { family: 'Rajdhani' } } } }
-            }
-        });
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: { y: { grid: { color: '#111' } }, x: { display: false } },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        }
 
         function updateChart(data) {
+            if(!sensorChart) return;
             const time = new Date().toLocaleTimeString();
-            if(chart.data.labels.length > 30) {
-                chart.data.labels.shift();
-                chart.data.datasets[0].data.shift();
-                chart.data.datasets[1].data.shift();
+            if(sensorChart.data.labels.length > 20) {
+                sensorChart.data.labels.shift();
+                sensorChart.data.datasets[0].data.shift();
+                sensorChart.data.datasets[1].data.shift();
             }
-            chart.data.labels.push(time);
-            chart.data.datasets[0].data.push(data.temp_in);
-            chart.data.datasets[1].data.push(data.soil_moisture);
-            chart.update();
+            sensorChart.data.labels.push(time);
+            sensorChart.data.datasets[0].data.push(data.temp_in);
+            sensorChart.data.datasets[1].data.push(data.soil_moisture);
+            sensorChart.update();
         }
+
+        function logout() { localStorage.removeItem('token'); location.reload(); }
     </script>
 </body>
 </html>
