@@ -3,215 +3,262 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BIOCUBE | Ultimate Interface V2</title>
+    <title>BIOCUBE | Core Interface</title>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --neon-green: #39ff14;
-            --electric-cyan: #0ff;
-            --pure-gold: #ffcf00;
-            --blood-red: #ff073a;
-            --dark-void: #020205;
-            --glass: rgba(15, 20, 30, 0.9);
+            --acid-green: #bfff00;
+            --cyber-blue: #00f2ff;
+            --warning-orange: #ff9d00;
+            --danger-red: #ff3c3c;
+            --deep-space: #05070a;
+            --panel-bg: rgba(20, 25, 30, 0.95);
         }
 
         body {
             font-family: 'Rajdhani', sans-serif;
-            background: var(--dark-void);
-            color: #fff;
+            background: var(--deep-space);
+            color: #e0e0e0;
             margin: 0;
-            background-image: 
-                linear-gradient(rgba(57, 255, 20, 0.05) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(57, 255, 20, 0.05) 1px, transparent 1px);
-            background-size: 50px 50px;
+            overflow-x: hidden;
+            background-image: linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px), 
+                              linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
         }
 
-        /* --- HELP TOOLTIPS --- */
-        .help-trigger {
-            display: inline-block;
-            width: 18px; height: 18px;
-            background: var(--electric-cyan);
-            color: #000; border-radius: 50%;
-            text-align: center; font-size: 12px;
-            line-height: 18px; cursor: help;
-            font-weight: bold; margin-left: 10px;
-            vertical-align: middle;
+        /* --- AUTH SCREEN --- */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle at center, #1a202c 0%, #05070a 100%);
+            z-index: 10000;
         }
-        .help-trigger:hover::after {
-            content: attr(data-help);
-            position: absolute; left: 10px; right: 10px; top: 40px;
-            background: #111; color: #fff; border: 1px solid var(--electric-cyan);
-            padding: 10px; border-radius: 5px; z-index: 100; font-family: 'Rajdhani';
-            font-weight: normal; text-transform: none; line-height: 1.3;
+        .terminal-card {
+            background: var(--panel-bg); border: 1px solid var(--acid-green);
+            padding: 40px; border-radius: 5px; box-shadow: 0 0 20px rgba(191, 255, 0, 0.15);
+            width: 90%; max-width: 400px; text-align: center;
+        }
+        .terminal-card h1 { font-family: 'Orbitron'; color: var(--acid-green); letter-spacing: 5px; margin-bottom: 30px; }
+
+        input {
+            width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5);
+            border: 1px solid #333; padding: 15px; color: var(--cyber-blue);
+            font-family: 'Rajdhani'; font-size: 1.1rem; margin-bottom: 10px;
+            outline: none; transition: 0.3s;
+        }
+        input:focus { border-color: var(--cyber-blue); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
+
+        /* --- NAVIGATION --- */
+        nav {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: rgba(5, 7, 10, 0.95); border-top: 1px solid rgba(0, 242, 255, 0.2);
+            display: flex; justify-content: space-around; padding: 10px 0;
+            z-index: 1000; backdrop-filter: blur(10px);
+        }
+        @media (min-width: 768px) {
+            nav { top: 0; bottom: auto; border-top: none; border-bottom: 1px solid rgba(0, 242, 255, 0.2); }
+        }
+        nav button {
+            background: none; border: none; color: #666; font-family: 'Orbitron';
+            font-size: 0.7rem; cursor: pointer; transition: 0.3s; padding: 10px;
+        }
+        nav button.active { color: var(--acid-green); text-shadow: 0 0 10px var(--acid-green); }
+
+        .app-container { max-width: 1200px; margin: 0 auto; padding: 15px 15px 80px 15px; }
+        @media (min-width: 768px) { .app-container { padding-top: 80px; } }
+
+        .hud-card {
+            background: var(--panel-bg); border-left: 4px solid var(--cyber-blue);
+            padding: 20px; margin-bottom: 15px; border-radius: 0 10px 10px 0;
+        }
+        .hud-header {
+            font-family: 'Orbitron'; font-size: 0.8rem; color: var(--cyber-blue);
+            margin-bottom: 15px; display: flex; justify-content: space-between;
         }
 
-        #auth-screen { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 10000; }
-        .login-box { background: var(--glass); border: 2px solid var(--neon-green); padding: 40px; border-radius: 15px; width: 320px; text-align: center; box-shadow: 0 0 30px rgba(57, 255, 20, 0.2); }
-        .login-box h1 { font-family: 'Orbitron'; color: var(--neon-green); }
+        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        #cam-feed { width: 100%; display: block; transform: rotate(180deg); transition: 0.3s; }
+        #cam-feed.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; object-fit: contain; background: #000; }
 
-        input { width: 100%; padding: 12px; margin: 10px 0; background: rgba(0,0,0,0.6); border: 1px solid #444; color: var(--electric-cyan); font-family: 'Rajdhani'; font-size: 18px; box-sizing: border-box; }
+        .sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(4, 1fr); } }
+        .sensor-module { 
+            background: rgba(255,255,255,0.03); padding: 15px; text-align: center; 
+            border: 1px solid rgba(255,255,255,0.05); transition: 0.3s;
+        }
+        .sensor-module:hover { border-color: var(--cyber-blue); }
+        .sensor-module .val { font-size: 2.2rem; font-weight: 700; color: #fff; line-height: 1; }
+        .sensor-module label { font-size: 0.7rem; color: var(--cyber-blue); text-transform: uppercase; display: block; margin-bottom: 5px; }
 
-        nav { position: fixed; bottom: 0; width: 100%; background: rgba(0,0,0,0.95); border-top: 2px solid var(--electric-cyan); display: flex; justify-content: space-around; padding: 10px 0; z-index: 999; }
-        @media (min-width: 768px) { nav { top: 0; bottom: auto; border-top: none; border-bottom: 2px solid var(--electric-cyan); } }
-        nav button { background: none; border: none; color: #aaa; font-family: 'Orbitron'; font-size: 10px; cursor: pointer; }
-        nav button.active { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
+        .btn-master {
+            width: 100%; padding: 15px; font-family: 'Orbitron'; font-weight: bold;
+            border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;
+            text-transform: uppercase;
+        }
+        .btn-master.on { background: var(--acid-green); color: #000; box-shadow: 0 0 15px rgba(191, 255, 0, 0.3); }
+        .btn-master.off { background: #222; color: #fff; }
+        
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #222; }
+        .btn-toggle { padding: 8px 15px; border-radius: 20px; border: 1px solid #444; background: none; color: #fff; font-weight: bold; cursor: pointer; }
+        .btn-toggle.active { background: var(--cyber-blue); color: #000; border-color: var(--cyber-blue); }
 
-        .container { max-width: 1100px; margin: 0 auto; padding: 20px 20px 120px 20px; }
-        @media (min-width: 768px) { .container { padding-top: 100px; } }
-
-        .card { background: var(--glass); border: 1px solid rgba(0, 255, 255, 0.1); padding: 20px; border-radius: 12px; margin-bottom: 20px; position: relative; }
-        .card-title { font-family: 'Orbitron'; font-size: 14px; color: var(--electric-cyan); margin-bottom: 15px; display: flex; align-items: center; }
-
-        .sensor-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 15px; }
-        .module { background: rgba(255,255,255,0.02); padding: 20px; border-radius: 8px; text-align: center; border: 1px solid #222; }
-        .module .val { font-size: 32px; font-weight: bold; }
-        .module label { font-size: 12px; color: var(--neon-green); display: block; }
-
-        .npk-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
-        .npk-box { background: #000; border: 1px solid #333; padding: 10px; border-radius: 5px; }
-        .npk-box label { color: var(--pure-gold); font-size: 10px; display: block; }
-
-        .btn { width: 100%; padding: 15px; font-family: 'Orbitron'; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
-        .btn-green { background: var(--neon-green); color: #000; }
-        .btn-toggle { background: #333; color: #fff; border-radius: 20px; padding: 8px 20px; border: none; }
-        .btn-toggle.active { background: var(--neon-green); color: #000; box-shadow: 0 0 10px var(--neon-green); }
-
-        /* Admin Action Buttons */
-        .btn-mini { padding: 5px 10px; font-size: 11px; border-radius: 4px; cursor: pointer; border: none; font-family: 'Orbitron'; margin-right: 5px; }
-        .btn-promote { background: var(--neon-green); color: #000; }
-        .btn-demote { background: var(--pure-gold); color: #000; }
-        .btn-del { background: var(--blood-red); color: #fff; }
-
-        .row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #222; }
         .hidden { display: none !important; }
         .disabled { opacity: 0.2; pointer-events: none; }
-        #cam-feed { width: 100%; border-radius: 10px; background: #000; min-height: 250px; transform: rotate(180deg); }
+        
+        .admin-table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th { color: var(--cyber-blue); text-align: left; padding: 12px; border-bottom: 2px solid #222; }
+        td { padding: 12px; border-bottom: 1px solid #111; }
     </style>
 </head>
 <body>
 
     <div id="auth-screen">
-        <div class="login-box">
+        <div class="terminal-card">
             <h1>BIOCUBE</h1>
             <input type="text" id="username" placeholder="OPERATOR_ID">
             <input type="password" id="password" placeholder="ACCESS_CODE">
-            <button class="btn btn-green" onclick="handleAuth('login')">INITIALIZE LINK</button>
-            <p id="auth-msg" style="color:var(--blood-red); margin-top:15px; font-size:12px;"></p>
+            <div style="margin-top: 15px;">
+                <button class="btn-master on" onclick="handleAuth('login')">INITIALIZE</button>
+                <button class="btn-master off" style="font-size: 0.7rem; margin-top: 8px;" onclick="handleAuth('register')">NEW REGISTRATION</button>
+            </div>
+            <p id="auth-msg" style="color:var(--danger-red); margin-top:15px; font-size:0.8rem;"></p>
         </div>
     </div>
 
     <div id="app-screen" class="hidden">
         <nav>
             <button class="active" onclick="nav('home', this)">STATUS</button>
-            <button onclick="nav('settings', this)">LOGIC</button>
             <button onclick="nav('manual', this)">OVERRIDE</button>
+            <button onclick="nav('settings', this)">LOGIC</button>
             <button id="btn-admin-nav" class="hidden" onclick="nav('admin', this)">ADMIN</button>
-            <button onclick="logout()" style="color:var(--blood-red)">EXIT</button>
+            <button onclick="logout()" style="color:var(--danger-red)">EXIT</button>
         </nav>
 
-        <div class="container">
+        <div class="app-container">
+            
             <div id="page-home">
-                <div class="card">
-                    <div class="card-title">LIVE_VISUALS <span class="help-trigger" data-help="Real-time stream from Cube-Cam. Double click for fullscreen.">?</span></div>
-                    <img id="cam-feed" src="" alt="SIGNAL LOST" ondblclick="this.requestFullscreen()">
-                </div>
-
-                <div class="sensor-row">
-                    <div class="module"><label>TEMP</label><div class="val" id="v-temp">--</div><span>°C</span></div>
-                    <div class="module"><label>HUMIDITY</label><div class="val" id="v-hum">--</div><span>%</span></div>
-                    <div class="module"><label>SOIL</label><div class="val" id="v-soil">--</div><span>%</span></div>
-                    <div class="module"><label>NPK_RAW</label><div class="val" id="v-npk" style="font-size:16px;">--</div></div>
-                </div>
-
-                <div class="card" style="margin-top:20px;">
-                    <div class="card-title">DATA_EXPORT <span class="help-trigger" data-help="Standard: CSV for Excel. Academic: Full JSON raw metrics.">?</span></div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
-                        <button class="btn-toggle active" onclick="downloadData('standard')">EXPORT .CSV</button>
-                        <button class="btn-toggle active" onclick="downloadData('academic')">EXPORT .JSON</button>
+                <div class="hud-card">
+                    <div class="hud-header">
+                        <span>LIVE_FEED_01</span>
+                        <span id="pi-status-tag" style="color:var(--danger-red)">● LINK_DOWN</span>
+                    </div>
+                    <div class="cam-wrapper">
+                        <img id="cam-feed" src="" alt="SIGNAL LOST" ondblclick="toggleFullCam()">
                     </div>
                 </div>
 
-                <div class="card">
-                    <div class="card-title">TELEMETRY_TRENDS</div>
+                <div class="sensor-grid">
+                    <div class="sensor-module"><label>Temp</label><div class="val" id="v-temp">--</div><span>°C</span></div>
+                    <div class="sensor-module"><label>Humid</label><div class="val" id="v-hum">--</div><span>%</span></div>
+                    <div class="sensor-module"><label>Soil</label><div class="val" id="v-soil">--</div><span>%</span></div>
+                    <div class="sensor-module"><label>NPK (N-P-K)</label><div class="val" id="v-npk" style="font-size:1.1rem">--</div></div>
+                </div>
+
+                <div class="hud-card" style="margin-top:20px;">
+                    <div class="hud-header">24H_DATA_TREND</div>
                     <canvas id="sensorChart" style="max-height: 250px;"></canvas>
-                </div>
-            </div>
-
-            <div id="page-settings" class="hidden">
-                <div class="card">
-                    <div class="card-title">SYSTEM_LOGIC_CONFIG <span class="help-trigger" data-help="Set the environment bounds. The cube will auto-correct when these values are breached.">?</span></div>
-                    <div class="row" style="background:rgba(0,255,255,0.05); padding:10px; border-radius:5px;">
-                        <span>ENABLE AUTOMATION</span>
-                        <button id="auto-master" class="btn-toggle" onclick="toggleAuto()">OFF</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button class="btn-master off" style="margin-top:15px; font-size:0.7rem;" onclick="window.open('/api/download/standard')">CSV LOGS</button>
+                        <button class="btn-master off" style="margin-top:15px; font-size:0.7rem;" onclick="window.open('/api/download/academic')">RAW JSON</button>
                     </div>
-                    <div class="row"><span>Max Temperature (°C)</span><input type="number" id="t-temp" value="28"></div>
-                    <div class="row"><span>Min Soil Moisture (%)</span><input type="number" id="t-soil" value="30"></div>
-                    
-                    <div style="margin-top:15px;">
-                        <span style="font-size:12px; color:var(--electric-cyan); font-family:'Orbitron'">NPK THRESHOLDS (PPM)</span>
-                        <div class="npk-grid">
-                            <div class="npk-box"><label>Nitrogen</label><input type="number" id="t-n" value="50"></div>
-                            <div class="npk-box"><label>Phosphorus</label><input type="number" id="t-p" value="30"></div>
-                            <div class="npk-box"><label>Potassium</label><input type="number" id="t-k" value="40"></div>
-                        </div>
-                    </div>
-                    <button class="btn btn-green" style="margin-top:20px;" onclick="syncThresholds()">SYNC TO EEPROM</button>
                 </div>
             </div>
 
             <div id="page-manual" class="hidden">
-                <div class="card">
-                    <div class="card-title">HARDWARE_OVERRIDE <span class="help-trigger" data-help="Direct relay control. Automation must be OFF to use these.">?</span></div>
-                    <p id="lock-notice" style="color:var(--pure-gold); font-size:12px;">⚠️ AUTO-MODE ACTIVE: CONTROLS LOCKED</p>
+                <div class="hud-card">
+                    <div class="hud-header">HARDWARE_OVERRIDE</div>
+                    <p id="manual-lock-msg" style="color:var(--warning-orange); font-size:0.8rem;">⚠️ AUTO-MODE ACTIVE: COMMANDS REJECTED</p>
                     <div id="manual-controls" class="disabled">
-                        <div class="row"><span>Water Pump</span><button class="btn-toggle" onclick="actuate('water', this)">OFF</button></div>
-                        <div class="row"><span>Nutrient Injector</span><button class="btn-toggle" onclick="actuate('nutrient', this)">OFF</button></div>
-                        <div class="row"><span>Exhaust Fan</span><button class="btn-toggle" onclick="actuate('exhaust', this)">OFF</button></div>
-                        <div class="row"><span>Peltier Cooler</span><button class="btn-toggle" onclick="actuate('cool', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Water Pump</span><button class="btn-toggle" onclick="toggleActuator('water', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Nutrient Pump</span><button class="btn-toggle" onclick="toggleActuator('nutrient', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Exhaust Fan</span><button class="btn-toggle" onclick="toggleActuator('exhaust', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Peltier Cooling</span><button class="btn-toggle" onclick="toggleActuator('cool', this)">OFF</button></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="page-settings" class="hidden">
+                <div class="hud-card">
+                    <div class="hud-header">SYSTEM_THRESHOLDS</div>
+                    <div class="toggle-row" style="margin-bottom:20px;">
+                        <span>AUTO MODE</span>
+                        <button id="btn-auto-toggle" class="btn-toggle" onclick="toggleAuto()">OFF</button>
+                    </div>
+                    
+                    <div class="input-group">
+                        <div class="toggle-row">
+                            <span>Cooling Trigger (Temp > X°C)</span>
+                            <input type="number" id="th-temp" value="28" style="width:60px;">
+                        </div>
+                        <div class="toggle-row">
+                            <span>Exhaust Trigger (Humid > X%)</span>
+                            <input type="number" id="th-hum" value="70" style="width:60px;">
+                        </div>
+                        <div class="toggle-row">
+                            <span>Watering Trigger (Soil < X%)</span>
+                            <input type="number" id="th-soil" value="30" style="width:60px;">
+                        </div>
+                        <button class="btn-master on" onclick="updateThresholds()">SYNC TO BIOCUBE</button>
                     </div>
                 </div>
             </div>
 
             <div id="page-admin" class="hidden">
-                <div class="card">
-                    <div class="card-title">OPERATOR_SECURITY_ROOT <span class="help-trigger" data-help="Promote/Demote or Delete users from the central database.">?</span></div>
-                    <table style="width:100%; border-collapse:collapse; font-size:14px;">
-                        <thead><tr style="color:var(--neon-green); text-align:left;"><th>OPERATOR</th><th>ROLE</th><th>ACTIONS</th></tr></thead>
-                        <tbody id="admin-user-list"></tbody>
-                    </table>
+                <div class="hud-card">
+                    <div class="hud-header">OPERATOR_MANAGEMENT</div>
+                    <div class="admin-table-container">
+                        <table>
+                            <thead>
+                                <tr><th>USER</th><th>ROLE</th><th>PERMS</th><th>ACTION</th></tr>
+                            </thead>
+                            <tbody id="admin-user-list"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
+
         </div>
     </div>
 
     <script>
         const socket = io();
         let isAuto = true;
-        let currentUser = "";
-        let sessionHistory = [];
+        let myRole = 'operator';
 
+        // --- AUTHENTICATION ---
         async function handleAuth(type) {
             const u = document.getElementById('username').value;
             const p = document.getElementById('password').value;
+            if(!u || !p) return alert("Credentials Required");
+
             const res = await fetch(`/api/${type}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({username: u, password: p})
             });
             const data = await res.json();
+            
             if(data.status === 'ok') {
-                currentUser = u;
                 if(type === 'login') {
                     localStorage.setItem('token', data.token);
+                    myRole = data.role;
                     document.getElementById('auth-screen').classList.add('hidden');
                     document.getElementById('app-screen').classList.remove('hidden');
-                    if(data.role === 'admin') document.getElementById('btn-admin-nav').classList.remove('hidden');
-                } else alert("Registration complete. Please Login.");
-            } else document.getElementById('auth-msg').innerText = data.error;
+                    if(myRole === 'admin') document.getElementById('btn-admin-nav').classList.remove('hidden');
+                } else {
+                    alert("Registration Successful. Please Initialize.");
+                }
+            } else {
+                document.getElementById('auth-msg').innerText = data.error.toUpperCase();
+            }
         }
 
+        function logout() { localStorage.removeItem('token'); location.reload(); }
+
+        // --- NAVIGATION ---
         function nav(page, btn) {
             document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
@@ -220,65 +267,85 @@
             if(page === 'admin') loadAdminData();
         }
 
-        socket.on('update', (data) => {
-            document.getElementById('v-temp').innerText = data.temp_in.toFixed(1);
-            document.getElementById('v-hum').innerText = data.hum_in.toFixed(1);
-            document.getElementById('v-soil').innerText = data.soil_moisture;
-            document.getElementById('v-npk').innerText = `${data.npk_n}|${data.npk_p}|${data.npk_k}`;
-            
-            sessionHistory.push({...data, timestamp: new Date().toISOString()});
-            if(sessionHistory.length > 1000) sessionHistory.shift();
+        // --- SOCKETS ---
+        socket.on('feed', (data) => { document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data; });
+        
+        socket.on('pi_status', (data) => {
+            const tag = document.getElementById('pi-status-tag');
+            if(data.online) {
+                tag.innerText = "● LINK_ACTIVE"; tag.style.color = "var(--acid-green)";
+            } else {
+                tag.innerText = "● LINK_DOWN"; tag.style.color = "var(--danger-red)";
+            }
+        });
 
+        socket.on('update', (data) => {
+            document.getElementById('v-temp').innerText = data.temp_in ? data.temp_in.toFixed(1) : "--";
+            document.getElementById('v-hum').innerText = data.hum_in ? data.hum_in.toFixed(1) : "--";
+            document.getElementById('v-soil').innerText = data.soil_moisture || "--";
+            document.getElementById('v-npk').innerText = `${data.npk_n || 0}-${data.npk_p || 0}-${data.npk_k || 0}`;
+            
             isAuto = data.auto_mode;
-            const masterBtn = document.getElementById('auto-master');
-            masterBtn.innerText = isAuto ? "ON" : "OFF";
-            masterBtn.className = isAuto ? "btn-toggle active" : "btn-toggle";
-            document.getElementById('manual-controls').className = isAuto ? 'disabled' : '';
-            document.getElementById('lock-notice').className = isAuto ? '' : 'hidden';
+            const autoBtn = document.getElementById('btn-auto-toggle');
+            const manualDiv = document.getElementById('manual-controls');
+            const lockMsg = document.getElementById('manual-lock-msg');
+
+            autoBtn.innerText = isAuto ? "ON" : "OFF";
+            autoBtn.className = isAuto ? "btn-toggle active" : "btn-toggle";
+            
+            if(isAuto) { manualDiv.classList.add('disabled'); lockMsg.classList.remove('hidden'); }
+            else { manualDiv.classList.remove('disabled'); lockMsg.classList.add('hidden'); }
+            
             updateChart(data);
         });
 
-        socket.on('feed', (data) => { document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data; });
-
-        function downloadData(mode) {
-            if(sessionHistory.length === 0) return alert("No telemetry recorded.");
-            let blob, filename;
-            if(mode === 'standard') {
-                const headers = "Timestamp,Temp,Humidity,Soil,N,P,K\n";
-                const rows = sessionHistory.map(d => `${d.timestamp},${d.temp_in},${d.hum_in},${d.soil_moisture},${d.npk_n},${d.npk_p},${d.npk_k}`).join("\n");
-                blob = new Blob([headers + rows], {type: 'text/csv'});
-                filename = `biocube_log.csv`;
-            } else {
-                blob = new Blob([JSON.stringify(sessionHistory, null, 2)], {type: 'application/json'});
-                filename = `biocube_research.json`;
-            }
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = filename;
-            link.click();
+        // --- CONTROLS & THRESHOLDS ---
+        function toggleFullCam() { document.getElementById('cam-feed').classList.toggle('fullscreen'); }
+        function toggleAuto() { socket.emit('control_cmd', { cmd: 'set_auto', val: !isAuto }); }
+        
+        function toggleActuator(name, btn) {
+            const turnOn = btn.innerText === "OFF";
+            socket.emit('control_cmd', { cmd: name, val: turnOn });
+            btn.innerText = turnOn ? "ON" : "OFF";
+            btn.classList.toggle('active');
         }
 
+        function updateThresholds() {
+            const t = parseInt(document.getElementById('th-temp').value);
+            const h = parseInt(document.getElementById('th-hum').value); // EXHAUST THRESHOLD
+            const s = parseInt(document.getElementById('th-soil').value);
+            
+            if(isNaN(t) || isNaN(h) || isNaN(s)) return alert("INVALID DATA");
+            
+            socket.emit('control_cmd', { 
+                cmd: 'update_thresholds', 
+                val: { temp: t, humid: h, soil: s } 
+            });
+            alert("THRESHOLDS SYNCED TO CORE");
+        }
+
+        // --- ADMIN MANAGEMENT ---
         async function loadAdminData() {
             const res = await fetch('/api/users');
             const users = await res.json();
-            document.getElementById('admin-user-list').innerHTML = users.map(u => `
-                <tr style="border-bottom:1px solid #222;">
-                    <td style="padding:15px 0;">${u.username}</td>
-                    <td style="color:${u.role === 'admin' ? 'var(--neon-green)' : '#888'}">${u.role.toUpperCase()}</td>
+            const tbody = document.getElementById('admin-user-list');
+            tbody.innerHTML = '';
+            users.forEach(u => {
+                tbody.innerHTML += `<tr>
+                    <td>${u.username}</td>
+                    <td>${u.role}</td>
+                    <td>M:${u.canManual ? 'Y' : 'N'} | A:${u.canEditAuto ? 'Y' : 'N'}</td>
                     <td>
-                        ${u.role === 'operator' ? 
-                            `<button class="btn-mini btn-promote" onclick="adminAction('${u.username}', 'promote')">PROMOTE</button>` :
-                            `<button class="btn-mini btn-demote" onclick="adminAction('${u.username}', 'demote')">DEMOTE</button>`
-                        }
-                        <button class="btn-mini btn-del" onclick="adminAction('${u.username}', 'delete')">DEL</button>
+                        <button onclick="adminAction('${u.username}', 'ban')" style="color:red; background:none; border:none; cursor:pointer;">BAN</button>
+                        <button onclick="adminAction('${u.username}', 'promote')" style="color:cyan; background:none; border:none; cursor:pointer;">PRO</button>
+                        <button onclick="adminAction('${u.username}', 'delete')" style="color:gray; background:none; border:none; cursor:pointer;">DEL</button>
                     </td>
-                </tr>
-            `).join('');
+                </tr>`;
+            });
         }
 
         async function adminAction(targetUser, action) {
-            if(targetUser === currentUser && action !== 'promote') return alert("Self-modification restricted.");
-            if(action === 'delete' && !confirm("Permanent deletion?")) return;
+            if(!confirm(`Confirm ${action} on ${targetUser}?`)) return;
             await fetch('/api/admin/action', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -287,44 +354,40 @@
             loadAdminData();
         }
 
-        // Chart setup
+        // --- CHARTING ---
         const ctx = document.getElementById('sensorChart').getContext('2d');
         const chart = new Chart(ctx, {
             type: 'line',
-            data: { labels: [], datasets: [
-                { label: 'Temp', data: [], borderColor: '#0ff', tension: 0.4, pointRadius: 0 },
-                { label: 'Soil', data: [], borderColor: '#39ff14', tension: 0.4, pointRadius: 0 }
-            ]},
-            options: { responsive: true, maintainAspectRatio: false, scales: { x: { display: false }, y: { grid: { color: '#222' } } } }
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Temp', data: [], borderColor: '#00f2ff', tension: 0.4, pointRadius: 0 },
+                    { label: 'Soil', data: [], borderColor: '#bfff00', tension: 0.4, pointRadius: 0 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { 
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#666' } }, 
+                    x: { grid: { display: false }, ticks: { display: false } } 
+                },
+                plugins: { legend: { labels: { color: '#fff', font: { family: 'Rajdhani' } } } }
+            }
         });
 
         function updateChart(data) {
-            if(chart.data.labels.length > 30) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); chart.data.datasets[1].data.shift(); }
-            chart.data.labels.push("");
+            const time = new Date().toLocaleTimeString();
+            if(chart.data.labels.length > 30) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[1].data.shift();
+            }
+            chart.data.labels.push(time);
             chart.data.datasets[0].data.push(data.temp_in);
             chart.data.datasets[1].data.push(data.soil_moisture);
-            chart.update('none');
+            chart.update();
         }
-
-        function actuate(cmd, btn) {
-            const state = btn.innerText === "OFF";
-            socket.emit('control_cmd', { cmd: cmd, val: state });
-            btn.innerText = state ? "ON" : "OFF";
-            btn.classList.toggle('active');
-        }
-        function toggleAuto() { socket.emit('control_cmd', { cmd: 'set_auto', val: !isAuto }); }
-        function syncThresholds() {
-            const vals = {
-                temp: document.getElementById('t-temp').value,
-                soil: document.getElementById('t-soil').value,
-                n: document.getElementById('t-n').value,
-                p: document.getElementById('t-p').value,
-                k: document.getElementById('t-k').value
-            };
-            socket.emit('control_cmd', { cmd: 'update_thresholds', val: vals });
-            alert("EEPROM Synced.");
-        }
-        function logout() { localStorage.removeItem('token'); location.reload(); }
     </script>
 </body>
 </html>
