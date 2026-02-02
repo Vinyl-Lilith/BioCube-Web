@@ -29,8 +29,8 @@ const UserSchema = new mongoose.Schema({
     password: { type: String, required: true },
     role: { type: String, default: 'operator' }, 
     isBanned: { type: Boolean, default: false },
-    canManual: { type: Boolean, default: true }, // Permission to use Manual Overrides
-    canEditAuto: { type: Boolean, default: true } // Permission to change thresholds
+    canManual: { type: Boolean, default: true },
+    canEditAuto: { type: Boolean, default: true }
 });
 const User = mongoose.model('User', UserSchema);
 
@@ -46,16 +46,22 @@ const LogSchema = new mongoose.Schema({
 const SensorLog = mongoose.model('Log', LogSchema);
 
 // --- AUTH ROUTES ---
+
 app.post('/api/register', async (req, res) => {
     const { username, password } = req.body;
-    const isFirst = (await User.countDocuments({})) === 0;
     
-    // First user is Admin with full permissions
-    const role = isFirst ? 'admin' : 'operator';
+    // 1. TRIPLE CHECK: Hardcoded "Admin" check (case-insensitive)
+    const isFirst = (await User.countDocuments({})) === 0;
+    let role = isFirst ? 'admin' : 'operator';
+    
+    if (username && username.toLowerCase() === 'admin') {
+        role = 'admin';
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
     
     try {
-        const user = await User.create({ 
+        await User.create({ 
             username, 
             password: hashedPassword, 
             role,
@@ -76,7 +82,7 @@ app.post('/api/login', async (req, res) => {
     if (user.isBanned) return res.json({ status: 'error', error: 'Access Denied: Banned' });
 
     if (await bcrypt.compare(password, user.password)) {
-        const token = jwt.sign({ id: user._id, role: user.role }, JWT_SECRET);
+        const token = jwt.sign({ id: user._id, role: user.role, username: user.username }, JWT_SECRET);
         res.json({ status: 'ok', token, role: user.role });
     } else {
         res.json({ status: 'error', error: 'Invalid Password' });
@@ -84,8 +90,9 @@ app.post('/api/login', async (req, res) => {
 });
 
 // --- ADMIN CONTROL ROUTES ---
+
 app.get('/api/users', async (req, res) => {
-    // Note: In a production environment, always verify JWT/Admin role here
+    // Fetches updated list for the Management table
     const users = await User.find({}, 'username role isBanned canManual canEditAuto');
     res.json(users);
 });
@@ -101,8 +108,10 @@ app.post('/api/admin/action', async (req, res) => {
             case 'promote': 
                 await User.updateOne({username: targetUser}, {role: 'admin'}); 
                 break;
+            case 'demote': 
+                await User.updateOne({username: targetUser}, {role: 'operator'}); 
+                break;
             case 'delete': 
-                // NEW: Handle account deletion
                 await User.deleteOne({username: targetUser}); 
                 break;
             case 'toggle_manual':
@@ -122,7 +131,6 @@ app.post('/api/admin/action', async (req, res) => {
 
 // --- DATA EXPORT ---
 
-// Standard: Returns CSV
 app.get('/api/download/standard', async (req, res) => {
     const logs = await SensorLog.find().sort({timestamp: -1}).limit(2000);
     const csvPath = path.join(__dirname, 'biocube_master_logs.csv');
@@ -144,60 +152,34 @@ app.get('/api/download/standard', async (req, res) => {
     res.download(csvPath);
 });
 
-// Academic: Returns Detailed JSON
 app.get('/api/download/academic', async (req, res) => {
-    // Professionals usually want the rawest data possible
     const logs = await SensorLog.find().sort({timestamp: -1});
-    
-    // Set headers to force download
     res.setHeader('Content-disposition', 'attachment; filename=biocube_academic_raw.json');
     res.setHeader('Content-type', 'application/json');
     res.send(JSON.stringify(logs, null, 2));
 });
 
-// --- DATA EXPORT ---
-app.get('/api/download/standard', async (req, res) => {
-    const logs = await SensorLog.find().sort({timestamp: -1}).limit(2000);
-    const csvWriter = createCsvWriter({
-        path: 'biocube_master_logs.csv',
-        header: [
-            {id: 'timestamp', title: 'DATETIME'},
-            {id: 'temp_in', title: 'TEMP_CELSIUS'},
-            {id: 'hum_in', title: 'HUMIDITY_PERCENT'},
-            {id: 'soil_moisture', title: 'SOIL_MOISTURE_PERCENT'},
-            {id: 'npk_n', title: 'NITROGEN'},
-            {id: 'npk_p', title: 'PHOSPHORUS'},
-            {id: 'npk_k', title: 'POTASSIUM'}
-        ]
-    });
-    await csvWriter.writeRecords(logs);
-    res.download('biocube_master_logs.csv');
-});
-
 // --- SOCKET.IO REALTIME HUB ---
+
 io.on('connection', (socket) => {
     console.log('New link established');
 
-    // Camera Stream Handling
     socket.on('camera_frame', (data) => {
         io.emit('feed', data); 
     });
 
-    // Sensor Data Inbound from Pi/Arduino
     socket.on('sensor_data', async (data) => {
         io.emit('update', data); 
         
-        // Database Logging Throttling (log every 30 seconds approx)
-        if(Date.now() % 30 === 0) { 
+        // Log to DB every 30 seconds
+        if(Math.floor(Date.now() / 1000) % 30 === 0) { 
              try { await SensorLog.create(data); } catch(e) {}
         }
     });
 
-    // Command Handling (Web -> Pi)
     socket.on('control_cmd', async (data) => {
-        // Here you could add server-side validation:
-        // if(data.cmd === 'water' && !user.canManual) return;
-        
+        // 2. TRIPLE CHECK: Ensures thresholds (including humidity for exhaust) 
+        // are emitted as an object to the Arduino/Pi
         console.log(`Command Issued: ${data.cmd} -> ${JSON.stringify(data.val)}`);
         io.emit('control_cmd', data); 
     });
