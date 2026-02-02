@@ -85,7 +85,7 @@ app.post('/api/login', async (req, res) => {
 
 // --- ADMIN CONTROL ROUTES ---
 app.get('/api/users', async (req, res) => {
-    // In a live system, add JWT verification middleware here
+    // Note: In a production environment, always verify JWT/Admin role here
     const users = await User.find({}, 'username role isBanned canManual canEditAuto');
     res.json(users);
 });
@@ -93,19 +93,66 @@ app.get('/api/users', async (req, res) => {
 app.post('/api/admin/action', async (req, res) => {
     const { targetUser, action } = req.body;
     
-    switch(action) {
-        case 'ban': 
-            await User.updateOne({username: targetUser}, {isBanned: true}); break;
-        case 'promote': 
-            await User.updateOne({username: targetUser}, {role: 'admin'}); break;
-        case 'toggle_manual':
-            const uM = await User.findOne({username: targetUser});
-            await User.updateOne({username: targetUser}, {canManual: !uM.canManual}); break;
-        case 'toggle_auto':
-            const uA = await User.findOne({username: targetUser});
-            await User.updateOne({username: targetUser}, {canEditAuto: !uA.canEditAuto}); break;
+    try {
+        switch(action) {
+            case 'ban': 
+                await User.updateOne({username: targetUser}, {isBanned: true}); 
+                break;
+            case 'promote': 
+                await User.updateOne({username: targetUser}, {role: 'admin'}); 
+                break;
+            case 'delete': 
+                // NEW: Handle account deletion
+                await User.deleteOne({username: targetUser}); 
+                break;
+            case 'toggle_manual':
+                const uM = await User.findOne({username: targetUser});
+                await User.updateOne({username: targetUser}, {canManual: !uM.canManual}); 
+                break;
+            case 'toggle_auto':
+                const uA = await User.findOne({username: targetUser});
+                await User.updateOne({username: targetUser}, {canEditAuto: !uA.canEditAuto}); 
+                break;
+        }
+        res.json({status: 'ok'});
+    } catch (e) {
+        res.status(500).json({status: 'error', error: 'Internal Server Error'});
     }
-    res.json({status: 'ok'});
+});
+
+// --- DATA EXPORT ---
+
+// Standard: Returns CSV
+app.get('/api/download/standard', async (req, res) => {
+    const logs = await SensorLog.find().sort({timestamp: -1}).limit(2000);
+    const csvPath = path.join(__dirname, 'biocube_master_logs.csv');
+    
+    const csvWriter = createCsvWriter({
+        path: csvPath,
+        header: [
+            {id: 'timestamp', title: 'DATETIME'},
+            {id: 'temp_in', title: 'TEMP_CELSIUS'},
+            {id: 'hum_in', title: 'HUMIDITY_PERCENT'},
+            {id: 'soil_moisture', title: 'SOIL_MOISTURE_PERCENT'},
+            {id: 'npk_n', title: 'NITROGEN'},
+            {id: 'npk_p', title: 'PHOSPHORUS'},
+            {id: 'npk_k', title: 'POTASSIUM'}
+        ]
+    });
+    
+    await csvWriter.writeRecords(logs);
+    res.download(csvPath);
+});
+
+// Academic: Returns Detailed JSON
+app.get('/api/download/academic', async (req, res) => {
+    // Professionals usually want the rawest data possible
+    const logs = await SensorLog.find().sort({timestamp: -1});
+    
+    // Set headers to force download
+    res.setHeader('Content-disposition', 'attachment; filename=biocube_academic_raw.json');
+    res.setHeader('Content-type', 'application/json');
+    res.send(JSON.stringify(logs, null, 2));
 });
 
 // --- DATA EXPORT ---
