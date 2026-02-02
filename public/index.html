@@ -1,326 +1,654 @@
+<!-- Updated: BioCube Controller - Responsive, modern UI with threshold controls & admin features -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BIOCUBE | Core Interface</title>
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
-    <style>
-        :root {
-            --acid-green: #bfff00;
-            --cyber-blue: #00f2ff;
-            --warning-orange: #ff9d00;
-            --danger-red: #ff3c3c;
-            --deep-space: #05070a;
-            --panel-bg: rgba(20, 25, 30, 0.95);
-        }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BioCube • Controller</title>
 
-        body {
-            font-family: 'Rajdhani', sans-serif;
-            background: var(--deep-space);
-            color: #e0e0e0;
-            margin: 0;
-            overflow-x: hidden;
-            background-image: linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
-            background-size: 30px 30px;
-        }
+  <!-- Dependencies -->
+  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
 
-        /* --- AUTH SCREEN --- */
-        #auth-screen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
-            display: flex; align-items: center; justify-content: center;
-            background: radial-gradient(circle at center, #1a202c 0%, #05070a 100%);
-            z-index: 10000;
-        }
-        .terminal-card {
-            background: var(--panel-bg); border: 1px solid var(--acid-green);
-            padding: 40px; border-radius: 5px; box-shadow: 0 0 20px rgba(191, 255, 0, 0.15);
-            width: 90%; max-width: 400px; text-align: center;
-        }
-        .terminal-card h1 { font-family: 'Orbitron'; color: var(--acid-green); letter-spacing: 5px; margin-bottom: 30px; }
+  <style>
+    :root{
+      --bg:#0f1720;
+      --panel:#0b1220;
+      --muted:#9aa4b2;
+      --accent:#2be6a6;
+      --card:#0f1822;
+      --glass: rgba(255,255,255,0.03);
+      --radius:12px;
+      --gap:16px;
+      --max-width:1200px;
+      --txt:#e6eef6;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,#071018 0%, #07121a 60%);
+      color:var(--txt);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      padding:24px;
+      display:flex;
+      justify-content:center;
+    }
 
-        input {
-            width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5);
-            border: 1px solid #333; padding: 15px; color: var(--cyber-blue);
-            font-family: 'Rajdhani'; font-size: 1.1rem; margin-bottom: 10px;
-        }
+    /* Layout container */
+    .app {
+      width:100%;
+      max-width:var(--max-width);
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:16px;
+      padding:18px;
+      box-shadow: 0 10px 30px rgba(2,6,23,0.6);
+      display:grid;
+      grid-template-columns: 250px 1fr;
+      gap:var(--gap);
+      min-height:80vh;
+    }
 
-        /* --- NAVIGATION --- */
-        nav {
-            position: fixed; bottom: 0; left: 0; width: 100%;
-            background: rgba(5, 7, 10, 0.95); border-top: 1px solid rgba(0, 242, 255, 0.2);
-            display: flex; justify-content: space-around; padding: 10px 0;
-            z-index: 1000; backdrop-filter: blur(10px);
-        }
-        nav button {
-            background: none; border: none; color: #666; font-family: 'Orbitron';
-            font-size: 0.7rem; cursor: pointer; transition: 0.3s;
-        }
-        nav button.active { color: var(--acid-green); text-shadow: 0 0 10px var(--acid-green); }
+    /* Left: Nav */
+    .sidebar{
+      background:var(--panel);
+      border-radius:12px;
+      padding:16px;
+      display:flex;
+      flex-direction:column;
+      gap:12px;
+      min-height:420px;
+      align-items:flex-start;
+    }
+    .brand{display:flex;align-items:center;gap:10px}
+    .logo{
+      height:44px;width:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#56f0c1);
+      display:flex;align-items:center;justify-content:center;font-weight:700;color:#021015;
+      box-shadow:0 6px 18px rgba(43,230,166,0.12);
+    }
+    h1{font-size:18px;margin:0}
+    .muted{color:var(--muted);font-size:13px}
 
-        /* --- UI COMPONENTS --- */
-        .app-container { max-width: 1200px; margin: 0 auto; padding: 15px 15px 80px 15px; }
-        .hud-card {
-            background: var(--panel-bg); border-left: 4px solid var(--cyber-blue);
-            padding: 20px; margin-bottom: 15px; border-radius: 0 10px 10px 0;
-        }
-        .hud-header {
-            font-family: 'Orbitron'; font-size: 0.8rem; color: var(--cyber-blue);
-            margin-bottom: 15px; display: flex; justify-content: space-between;
-        }
+    nav .nav-btn{
+      width:100%;
+      text-align:left;
+      background:transparent;
+      border:none;
+      color:var(--txt);
+      padding:10px 12px;
+      border-radius:8px;
+      cursor:pointer;
+      display:flex;
+      align-items:center;
+      gap:10px;
+      font-size:15px;
+    }
+    nav .nav-btn.active{background:linear-gradient(90deg, rgba(43,230,166,0.08), rgba(43,230,166,0.03));
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+      border-left:3px solid var(--accent);
+      padding-left:9px;
+    }
 
-        /* Camera */
-        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-        #cam-feed { width: 100%; display: block; transform: rotate(180deg); transition: 0.3s; }
-        #cam-feed.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; object-fit: contain; background: #000; }
+    /* Main content */
+    .main{
+      display:flex;
+      flex-direction:column;
+      gap:16px;
+    }
 
-        /* Sensor Grid */
-        .sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-        @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(4, 1fr); } }
-        .sensor-module { background: rgba(255,255,255,0.03); padding: 15px; text-align: center; border: 1px solid rgba(255,255,255,0.05); }
-        .sensor-module .val { font-size: 2rem; font-weight: 700; color: #fff; }
-        .sensor-module label { font-size: 0.7rem; color: var(--cyber-blue); text-transform: uppercase; display: block; }
+    .topbar{
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:center;
+    }
+    .status {
+      display:flex;
+      gap:12px;
+      align-items:center;
+      font-size:14px;
+    }
+    .dot{height:10px;width:10px;border-radius:99px;background:#3b4250;display:inline-block}
+    .dot.online{background:var(--accent);box-shadow:0 0 8px rgba(43,230,166,0.18) }
 
-        /* Buttons & Toggles */
-        .btn-master {
-            width: 100%; padding: 15px; font-family: 'Orbitron'; font-weight: bold;
-            border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;
-        }
-        .btn-master.on { background: var(--acid-green); color: #000; }
-        .btn-master.off { background: #222; color: #fff; }
-        
-        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #222; }
-        .btn-toggle { padding: 8px 15px; border-radius: 20px; border: 1px solid #444; background: none; color: #fff; font-weight: bold; }
-        .btn-toggle.active { background: var(--cyber-blue); color: #000; border-color: var(--cyber-blue); }
+    .card{
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(255,255,255,0.02));
+      border-radius:12px;
+      padding:14px;
+      box-shadow: 0 4px 18px rgba(2,6,23,0.45);
+      border: 1px solid rgba(255,255,255,0.02);
+    }
 
-        .hidden { display: none !important; }
-        .disabled { opacity: 0.2; pointer-events: none; }
-        
-        /* Admin Table */
-        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-        th { color: var(--cyber-blue); text-align: left; padding: 10px; border-bottom: 2px solid #222; }
-        td { padding: 10px; border-bottom: 1px solid #111; }
-    </style>
+    .grid{
+      display:grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap:12px;
+    }
+    .full{grid-column: 1 / -1}
+
+    /* Camera */
+    #cam-feed{
+      width:100%;
+      height:220px;
+      object-fit:cover;
+      border-radius:10px;
+      background:linear-gradient(180deg,#05060a,#081017);
+      border:1px solid rgba(255,255,255,0.02);
+      cursor:pointer;
+    }
+    #cam-feed.fullscreen{
+      position:fixed;left:0;top:0;width:100vw;height:100vh;z-index:9999;background:black;object-fit:contain;border-radius:0;
+    }
+
+    /* Controls */
+    .sensor-list p{margin:8px 0;font-size:15px}
+    .big{font-size:20px;font-weight:600}
+    .muted-small{color:var(--muted);font-size:13px}
+
+    .controls{display:flex;flex-direction:column;gap:10px}
+    .toggle-btn{
+      background:var(--glass);
+      border:1px solid rgba(255,255,255,0.03);
+      padding:8px 12px;border-radius:10px;
+      cursor:pointer;font-weight:600;color:var(--txt)
+    }
+    .toggle-on{background:linear-gradient(90deg, rgba(43,230,166,0.12), rgba(43,230,166,0.04)); color:#001615}
+
+    .disabled{opacity:0.5;pointer-events:none}
+
+    /* Threshold form */
+    .row{display:flex;gap:10px}
+    input[type="number"]{
+      padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--txt);width:100%;
+    }
+    label{display:block;font-size:13px;margin-bottom:6px;color:var(--muted)}
+
+    .helper{font-size:13px;color:var(--muted);margin-top:6px}
+
+    /* User/Admin table */
+    table{width:100%;border-collapse:collapse;font-size:14px}
+    th,td{padding:10px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.02)}
+    .small-btn{padding:6px 8px;border-radius:8px;border:0;background:var(--glass);cursor:pointer;margin-right:6px}
+
+    /* Responsive */
+    @media (max-width:980px){
+      .app{grid-template-columns:1fr; padding:12px}
+      .grid{grid-template-columns:1fr}
+      #cam-feed{height:180px}
+      .sidebar{flex-direction:row;align-items:center;justify-content:space-between;padding:12px}
+      nav .nav-btn{display:none}
+      .mobile-nav{display:flex;gap:8px}
+      .brand h1{display:none}
+    }
+  </style>
 </head>
 <body>
+  <div class="app" id="root">
 
-    <div id="auth-screen">
-        <div class="terminal-card">
-            <h1>BIOCUBE</h1>
-            <input type="text" id="username" placeholder="OPERATOR_ID">
-            <input type="password" id="password" placeholder="ACCESS_CODE">
-            <button class="btn-master on" onclick="handleAuth('login')">LOGIN</button>
-            <button class="btn-master off" style="font-size: 0.7rem;" onclick="handleAuth('register')">NEW REGISTRATION</button>
-            <p id="auth-msg" style="color:var(--danger-red); margin-top:15px; font-size:0.8rem;"></p>
+    <!-- SIDE / NAV -->
+    <div class="sidebar card" role="navigation" aria-label="Main navigation">
+      <div class="brand">
+        <div class="logo">BC</div>
+        <div>
+          <h1>BioCube</h1>
+          <div class="muted">Smart greenhouse controller</div>
         </div>
+      </div>
+
+      <nav style="width:100%;margin-top:8px" id="main-nav">
+        <button class="nav-btn active" data-page="home" onclick="nav('home')">Dashboard</button>
+        <button class="nav-btn" data-page="auto" onclick="nav('auto')">Automatic</button>
+        <button class="nav-btn" data-page="manual" onclick="nav('manual')">Manual</button>
+        <button class="nav-btn" data-page="settings" onclick="nav('settings')">Settings</button>
+        <button id="btn-admin" class="nav-btn hidden" data-page="admin" onclick="nav('admin')">Admin</button>
+        <div style="height:8px"></div>
+        <div class="muted-small">Account</div>
+        <div style="display:flex;gap:8px;margin-top:6px;">
+          <button class="small-btn" onclick="logout()">Log Out</button>
+          <button class="small-btn" id="btn-profile" onclick="nav('profile')">Profile</button>
+        </div>
+      </nav>
+
+      <div style="margin-top:auto;width:100%">
+        <div class="muted-small">Pi Status</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
+          <div id="pi-status" class="dot" aria-hidden="true"></div>
+          <div class="muted-small" id="pi-uptime">Unknown</div>
+        </div>
+      </div>
     </div>
 
-    <div id="app-screen" class="hidden">
-        <nav>
-            <button class="active" onclick="nav('home', this)">STATUS</button>
-            <button onclick="nav('manual', this)">MANUAL</button>
-            <button onclick="nav('settings', this)">SETTINGS</button>
-            <button id="btn-admin-nav" class="hidden" onclick="nav('admin', this)">ADMIN</button>
-            <button onclick="logout()" style="color:var(--danger-red)">EXIT</button>
-        </nav>
-
-        <div class="app-container">
-            <div id="page-home">
-                <div class="hud-card">
-                    <div class="hud-header">
-                        <span>LIVE_FEED_CHANNEL_01</span>
-                        <span id="pi-status-tag" style="color:var(--danger-red)">● OFFLINE</span>
-                    </div>
-                    <div class="cam-wrapper">
-                        <img id="cam-feed" src="" alt="NO SIGNAL" ondblclick="toggleFullCam()">
-                    </div>
-                    <p style="font-size:0.6rem; color:#666; margin-top:5px;">DOUBLE TAP TO TOGGLE FULLSCREEN</p>
-                </div>
-
-                <div class="sensor-grid">
-                    <div class="sensor-module"><label>Temp</label><div class="val" id="v-temp">--</div><span>°C</span></div>
-                    <div class="sensor-module"><label>Humid</label><div class="val" id="v-hum">--</div><span>%</span></div>
-                    <div class="sensor-module"><label>Soil</label><div class="val" id="v-soil">--</div><span>%</span></div>
-                    <div class="sensor-module"><label>NPK</label><div class="val" id="v-npk" style="font-size:1.1rem">--</div></div>
-                </div>
-
-                <div class="hud-card" style="margin-top:20px;">
-                    <canvas id="sensorChart" style="max-height: 200px;"></canvas>
-                    <button class="btn-master off" style="margin-top:15px; font-size:0.7rem;" onclick="window.open('/api/download/standard')">DOWNLOAD DATA LOG (EXCEL)</button>
-                </div>
-            </div>
-
-            <div id="page-manual" class="hidden">
-                <div class="hud-card">
-                    <div class="hud-header">CORE_OVERRIDE</div>
-                    <p id="lock-msg" style="color:var(--warning-orange); font-size:0.8rem;">⚠️ AUTO-MODE ACTIVE: HARDWARE LOCKED</p>
-                    <div id="manual-controls" class="disabled">
-                        <div class="toggle-row"><span>Water Pump</span><button class="btn-toggle" onclick="toggleActuator('water', this)">OFF</button></div>
-                        <div class="toggle-row"><span>Nutrient Pump</span><button class="btn-toggle" onclick="toggleActuator('nutrient', this)">OFF</button></div>
-                        <div class="toggle-row"><span>Exhaust Fan</span><button class="btn-toggle" onclick="toggleActuator('exhaust', this)">OFF</button></div>
-                        <div class="toggle-row"><span>Peltier Cooling</span><button class="btn-toggle" onclick="toggleActuator('cool', this)">OFF</button></div>
-                    </div>
-                </div>
-            </div>
-
-            <div id="page-settings" class="hidden">
-                <div class="hud-card">
-                    <div class="hud-header">SYSTEM_LOGIC</div>
-                    <div class="toggle-row">
-                        <span>AUTO MODE</span>
-                        <button id="btn-auto-toggle" class="btn-toggle" onclick="toggleAuto()">OFF</button>
-                    </div>
-                    <div style="margin-top:20px;">
-                        <div class="toggle-row"><span>Temp Threshold</span><input type="number" id="th-temp" value="28" style="width:60px;"></div>
-                        <div class="toggle-row"><span>Soil Threshold</span><input type="number" id="th-soil" value="30" style="width:60px;"></div>
-                        <button class="btn-master on" onclick="saveThresholds()">SAVE TO EEPROM</button>
-                    </div>
-                </div>
-            </div>
-
-            <div id="page-admin" class="hidden">
-                <div class="hud-card">
-                    <div class="hud-header">USER_CLEARANCE_MANAGEMENT</div>
-                    <div style="overflow-x:auto;">
-                        <table>
-                            <thead><tr><th>USER</th><th>MANUAL</th><th>AUTO</th><th>STATUS</th><th>ACTION</th></tr></thead>
-                            <tbody id="admin-user-list"></tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+    <!-- MAIN -->
+    <div class="main">
+      <div class="topbar">
+        <div>
+          <div class="muted-small">Welcome back, <strong id="user-name">Guest</strong></div>
+          <div class="muted">Control and monitor your BioCube — touch friendly, mobile-ready</div>
         </div>
+        <div class="status">
+          <div class="muted-small">Connection</div>
+          <div id="conn-dot" class="dot"></div>
+        </div>
+      </div>
+
+      <!-- Pages -->
+      <div id="page-home" class="card">
+        <div class="grid">
+          <div>
+            <h3 style="margin:0 0 8px 0">Live Feed</h3>
+            <img id="cam-feed" src="" alt="Camera stream" onclick="toggleFullCam()" />
+            <div class="helper">Tap the image to toggle fullscreen</div>
+          </div>
+
+          <div>
+            <h3 style="margin:0 0 8px 0">Live Sensors</h3>
+            <div class="sensor-list">
+              <p>Temperature: <span id="val-temp" class="big">--</span> °C</p>
+              <p>Humidity: <span id="val-hum" class="big">--</span> %</p>
+              <p>Soil Moisture: <span id="val-soil" class="big">--</span> %</p>
+              <p>NPK (N-P-K): <span id="val-npk" class="big">-- - -- - --</span></p>
+              <p>Mode: <strong id="sys-mode" class="big">AUTO</strong></p>
+            </div>
+            <div style="margin-top:10px">
+              <button id="btn-toggle-auto" class="toggle-btn toggle-on" onclick="toggleAuto()">Auto: ON</button>
+              <button class="toggle-btn" onclick="downloadExcel()">Download Data</button>
+            </div>
+          </div>
+
+          <div class="full card">
+            <h3 style="margin-top:0">24h trend</h3>
+            <canvas id="sensorChart" height="120"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-auto" class="card hidden">
+        <h3 style="margin-top:0">Automatic • Thresholds</h3>
+        <div class="grid">
+          <div>
+            <div class="card">
+              <div>
+                <label for="t-temp">Temperature • Peltier & fans (°C)</label>
+                <input id="t-temp" type="number" min="5" max="45" step="1" />
+                <div class="muted-small">When temperature &gt; threshold, Peltier + cold & hot fans will run.</div>
+              </div>
+
+              <div style="margin-top:12px">
+                <label for="t-hum">Humidity • Exhaust (%)</label>
+                <input id="t-hum" type="number" min="20" max="95" step="1" />
+                <div class="muted-small">When humidity &gt; threshold, exhaust fan will run.</div>
+              </div>
+
+              <div style="margin-top:12px">
+                <label for="t-soil">Soil Moisture • Water pump (%)</label>
+                <input id="t-soil" type="number" min="0" max="100" step="1" />
+                <div class="muted-small">When soil moisture &lt; threshold, water pump will refill.</div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div class="card">
+              <label for="t-npk">NPK • Water + Nutrient pump (N value)</label>
+              <input id="t-npk" type="number" min="0" max="5000" step="1" />
+              <div class="muted-small">When N (nitrogen) &lt; threshold, water + nutrient pump cycles to feed plants.</div>
+
+              <div style="margin-top:12px">
+                <label>Auto-action parameters</label>
+                <div class="row">
+                  <div style="flex:1">
+                    <label for="pulse-ms">Pump pulse (ms)</label>
+                    <input id="pulse-ms" type="number" min="1000" max="600000" step="500" value="5000" />
+                  </div>
+                  <div style="flex:1">
+                    <label for="npk-check-interval">NPK check interval (ms)</label>
+                    <input id="npk-check-interval" type="number" min="1000" max="600000" step="1000" value="10000" />
+                  </div>
+                </div>
+                <div class="muted-small">Pulse applies only when NPK condition triggers. Intervals are sent to the controller.</div>
+              </div>
+
+              <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+                <button class="toggle-btn" onclick="restoreDefaults()">Restore defaults</button>
+                <button class="toggle-btn" onclick="sendThresholds()">Save & Apply</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-manual" class="card hidden">
+        <h3 style="margin-top:0">Manual Controls</h3>
+        <p class="muted-small">⚠️ Turn OFF Auto Mode to enable manual controls</p>
+
+        <div id="manual-controls" class="controls disabled">
+          <div style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+            <div><strong>Water Pump</strong><div class="muted-small">Toggle water pump</div></div>
+            <div>
+              <button id="btn-water" class="toggle-btn" onclick="toggleActuatorManual('water', this)">OFF</button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+            <div><strong>Nutrient Pump</strong><div class="muted-small">Toggle nutrient pump</div></div>
+            <div>
+              <button id="btn-nutrient" class="toggle-btn" onclick="toggleActuatorManual('nutrient', this)">OFF</button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+            <div><strong>Exhaust Fan</strong><div class="muted-small">Toggle exhaust fan</div></div>
+            <div>
+              <button id="btn-exhaust" class="toggle-btn" onclick="toggleActuatorManual('exhaust', this)">OFF</button>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:10px;align-items:center;justify-content:space-between">
+            <div><strong>Cooling (Peltier + Fans)</strong><div class="muted-small">Toggle Peltier with fans</div></div>
+            <div>
+              <button id="btn-cool" class="toggle-btn" onclick="toggleActuatorManual('cool', this)">OFF</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-settings" class="card hidden">
+        <h3 style="margin-top:0">Settings</h3>
+        <div style="display:flex;gap:12px;flex-direction:column">
+          <div class="card">
+            <label for="username">Username</label>
+            <input id="username" type="text" placeholder="username" />
+            <label for="password" style="margin-top:8px">Password</label>
+            <input id="password" type="password" placeholder="password" />
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button class="toggle-btn" onclick="auth('register')">Sign Up</button>
+              <button class="toggle-btn" onclick="auth('login')">Log In</button>
+            </div>
+            <div id="auth-msg" class="muted-small" style="margin-top:8px"></div>
+            <div class="muted-small" style="margin-top:8px">First user created may request admin rights — backend must accept the flag for secure assignment.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="page-admin" class="card hidden">
+        <h3 style="margin-top:0">Admin • User Management</h3>
+        <table id="user-table">
+          <thead><tr><th>Username</th><th>Role</th><th>Status</th><th>Controls</th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <div class="muted-small" style="margin-top:10px">Use actions to ban, restrict features, or promote other users. Restriction toggles will ask the backend to store per-user flags.</div>
+      </div>
+
+      <div id="page-profile" class="card hidden">
+        <h3 style="margin-top:0">Profile</h3>
+        <p id="profile-role">Role: guest</p>
+        <p class="muted-small">Local settings and last login details.</p>
+      </div>
     </div>
+  </div>
 
-    <script>
-        const socket = io();
-        let isAuto = true;
-        let myUserRole = 'operator';
+<script>
+  // --- Socket setup
+  const socket = io(); // default connect
+  let currentUser = null;
+  let isAuto = true;
+  let chart = null;
+  let chartMaxPoints = 36;
 
-        // --- AUTH ---
-        async function handleAuth(type) {
-            const u = document.getElementById('username').value;
-            const p = document.getElementById('password').value;
-            const res = await fetch(`/api/${type}`, {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({username: u, password: p})
-            });
-            const data = await res.json();
-            if(data.status === 'ok') {
-                if(type === 'login') {
-                    localStorage.setItem('token', data.token);
-                    myUserRole = data.role;
-                    document.getElementById('auth-screen').classList.add('hidden');
-                    document.getElementById('app-screen').classList.remove('hidden');
-                    if(myUserRole === 'admin') document.getElementById('btn-admin-nav').classList.remove('hidden');
-                } else {
-                    alert("Account Created. Please Login.");
-                }
-            } else {
-                document.getElementById('auth-msg').innerText = data.error.toUpperCase();
-            }
+  document.addEventListener('DOMContentLoaded', () => {
+    setupChart();
+    bindUI();
+    restoreDefaults(); // load defaults to inputs from local cache or default values
+  });
+
+  // --- UI helpers / Navigation
+  function nav(page) {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === page));
+    document.querySelectorAll('[id^="page-"]').forEach(p => p.classList.add('hidden'));
+    const el = document.getElementById('page-' + page);
+    if (el) el.classList.remove('hidden');
+  }
+
+  function bindUI() {
+    // connection visual
+    socket.on('connect', () => {
+      document.getElementById('conn-dot').classList.add('online');
+      document.getElementById('conn-dot').style.boxShadow = '0 0 10px rgba(43,230,166,0.18)';
+    });
+    socket.on('disconnect', () => {
+      document.getElementById('conn-dot').classList.remove('online');
+    });
+
+    socket.on('feed', (data) => {
+      const img = document.getElementById('cam-feed');
+      img.src = 'data:image/jpeg;base64,' + data;
+    });
+
+    socket.on('pi_status', (info) => {
+      document.getElementById('pi-status').classList.add('online');
+      if (info && info.uptime) document.getElementById('pi-uptime').innerText = info.uptime;
+    });
+
+    socket.on('update', (data) => {
+      updateSensors(data);
+    });
+
+    // heartbeat: forward to backend automatically
+    setInterval(() => socket.emit('control_cmd', { cmd: 'heartbeat' }), 5000);
+  }
+
+  // --- Auth & Profile (front-end) ---
+  async function auth(type) {
+    const u = document.getElementById('username').value?.trim();
+    const p = document.getElementById('password').value ?? '';
+    if (!u || !p) {
+      document.getElementById('auth-msg').innerText = 'Username and password are required';
+      return;
+    }
+    try {
+      const makeAdmin = !localStorage.getItem('everRegistered'); // attempt to request admin for first registration
+      const res = await fetch('/api/' + type, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ username: u, password: p, makeAdmin })
+      });
+      const json = await res.json();
+      if (json.status === 'ok') {
+        localStorage.setItem('everRegistered', '1');
+        if (type === 'login') {
+          localStorage.setItem('token', json.token);
+          currentUser = { username: u, role: json.role ?? 'user' };
+          document.getElementById('user-name').innerText = u;
+          document.getElementById('profile-role').innerText = `Role: ${currentUser.role}`;
+          if (currentUser.role === 'admin') document.getElementById('btn-admin').classList.remove('hidden');
+          loadApp();
+        } else {
+          // registered: auto-prompt login
+          document.getElementById('auth-msg').innerText = 'Registered. Now log in.';
         }
+      } else {
+        document.getElementById('auth-msg').innerText = json.error || 'Auth failed';
+      }
+    } catch (err) {
+      document.getElementById('auth-msg').innerText = 'Network error';
+    }
+  }
 
-        function logout() { localStorage.removeItem('token'); location.reload(); }
+  function loadApp() {
+    // show dashboard already in view -- nothing extra needed
+    if (currentUser && currentUser.role === 'admin') loadUsers();
+  }
 
-        // --- NAV ---
-        function nav(page, btn) {
-            document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
-            document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
-            document.getElementById(`page-${page}`).classList.remove('hidden');
-            btn.classList.add('active');
-            if(page === 'admin') loadAdminTable();
+  function logout() {
+    localStorage.removeItem('token');
+    location.reload();
+  }
+
+  // --- Sensors and Chart ---
+  function setupChart() {
+    const ctx = document.getElementById('sensorChart').getContext('2d');
+    chart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          { label: 'Temp (°C)', data: [], tension:0.3 },
+          { label: 'Soil (%)', data: [], tension:0.3 }
+        ]
+      },
+      options: {
+        responsive:true,
+        maintainAspectRatio:false,
+        scales: {
+          x: { display: true },
+          y: { display: true }
         }
+      }
+    });
+  }
 
-        // --- SOCKETS ---
-        socket.on('feed', data => { document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data; });
-        
-        socket.on('pi_status', () => {
-            const tag = document.getElementById('pi-status-tag');
-            tag.innerText = "● LINK ACTIVE"; tag.style.color = "var(--acid-green)";
-        });
+  function updateChart(data) {
+    const t = new Date().toLocaleTimeString();
+    const ds = chart.data;
+    if (ds.labels.length >= chartMaxPoints) {
+      ds.labels.shift();
+      ds.datasets.forEach(d => d.data.shift());
+    }
+    ds.labels.push(t);
+    ds.datasets[0].data.push(Number(data.temp_in.toFixed(2)));
+    ds.datasets[1].data.push(Number(data.soil_moisture));
+    chart.update();
+  }
 
-        socket.on('update', data => {
-            document.getElementById('v-temp').innerText = data.temp_in.toFixed(1);
-            document.getElementById('v-hum').innerText = data.hum_in.toFixed(1);
-            document.getElementById('v-soil').innerText = data.soil_moisture;
-            document.getElementById('v-npk').innerText = `${data.npk_n}-${data.npk_p}-${data.npk_k}`;
-            
-            isAuto = data.auto_mode;
-            const autoBtn = document.getElementById('btn-auto-toggle');
-            const manualDiv = document.getElementById('manual-controls');
-            const lockMsg = document.getElementById('lock-msg');
+  function updateSensors(data) {
+    document.getElementById('val-temp').innerText = isFinite(data.temp_in) ? data.temp_in.toFixed(1) : '--';
+    document.getElementById('val-hum').innerText = isFinite(data.hum_in) ? data.hum_in.toFixed(1) : '--';
+    document.getElementById('val-soil').innerText = Number.isFinite(data.soil_moisture) ? data.soil_moisture : '--';
+    document.getElementById('val-npk').innerText = `${data.npk_n ?? '--'} - ${data.npk_p ?? '--'} - ${data.npk_k ?? '--'}`;
 
-            autoBtn.innerText = isAuto ? "ON" : "OFF";
-            autoBtn.className = isAuto ? "btn-toggle active" : "btn-toggle";
-            
-            if(isAuto) { manualDiv.classList.add('disabled'); lockMsg.classList.remove('hidden'); }
-            else { manualDiv.classList.remove('disabled'); lockMsg.classList.add('hidden'); }
-            
-            updateChart(data);
-        });
+    isAuto = !!data.auto_mode;
+    document.getElementById('sys-mode').innerText = isAuto ? 'AUTO' : 'MANUAL';
+    const autoBtn = document.getElementById('btn-toggle-auto');
+    autoBtn.classList.toggle('toggle-on', isAuto);
+    autoBtn.innerText = `Auto: ${isAuto ? 'ON' : 'OFF'}`;
 
-        // --- CONTROLS ---
-        function toggleFullCam() { document.getElementById('cam-feed').classList.toggle('fullscreen'); }
-        function toggleAuto() { socket.emit('control_cmd', { cmd: 'set_auto', val: !isAuto }); }
-        
-        function toggleActuator(name, btn) {
-            const turnOn = btn.innerText === "OFF";
-            socket.emit('control_cmd', { cmd: name, val: turnOn });
-            btn.innerText = turnOn ? "ON" : "OFF";
-            btn.classList.toggle('active');
-        }
+    // enable/disable manual controls
+    const manualDiv = document.getElementById('manual-controls');
+    manualDiv.classList.toggle('disabled', isAuto);
 
-        function saveThresholds() {
-            const vals = { temp: parseInt(document.getElementById('th-temp').value), soil: parseInt(document.getElementById('th-soil').value) };
-            socket.emit('control_cmd', { cmd: 'update_thresholds', val: vals });
-            alert("SYNC COMPLETE");
-        }
+    updateChart(data);
+  }
 
-        // --- ADMIN ---
-        async function loadAdminTable() {
-            const res = await fetch('/api/users');
-            const users = await res.json();
-            const tbody = document.getElementById('admin-user-list');
-            tbody.innerHTML = '';
-            users.forEach(u => {
-                tbody.innerHTML += `<tr>
-                    <td>${u.username}</td>
-                    <td><button class="btn-toggle ${u.canManual?'active':''}" onclick="adminAction('${u.username}','toggle_manual')">M</button></td>
-                    <td><button class="btn-toggle ${u.canEditAuto?'active':''}" onclick="adminAction('${u.username}','toggle_auto')">A</button></td>
-                    <td>${u.isBanned ? 'VOID' : 'OK'}</td>
-                    <td><button onclick="adminAction('${u.username}','ban')" style="color:red; background:none; border:none;">BAN</button></td>
-                </tr>`;
-            });
-        }
+  // --- Camera fullscreen ---
+  function toggleFullCam() {
+    document.getElementById('cam-feed').classList.toggle('fullscreen');
+  }
 
-        async function adminAction(targetUser, action) {
-            await fetch('/api/admin/action', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({targetUser, action})
-            });
-            loadAdminTable();
-        }
+  // --- Control functions ---
+  function toggleAuto() {
+    const newState = !isAuto;
+    socket.emit('control_cmd', { cmd: 'set_auto', val: newState });
+    // optimistic UI:
+    isAuto = newState;
+    document.getElementById('btn-toggle-auto').classList.toggle('toggle-on', isAuto);
+    document.getElementById('btn-toggle-auto').innerText = `Auto: ${isAuto ? 'ON' : 'OFF'}`;
+    document.getElementById('manual-controls').classList.toggle('disabled', isAuto);
+  }
 
-        // --- CHART ---
-        const ctx = document.getElementById('sensorChart').getContext('2d');
-        const chart = new Chart(ctx, {
-            type: 'line',
-            data: { labels: [], datasets: [{ label: 'Temp', data: [], borderColor: '#00f2ff', tension: 0.3 }] },
-            options: { plugins: { legend: { display: false } }, scales: { x: { display: false } } }
-        });
+  function toggleActuatorManual(name, btn) {
+    // only allowed in manual mode (UI prevents but double-check)
+    if (isAuto) return;
+    const on = btn.innerText === 'OFF';
+    socket.emit('control_cmd', { cmd: name, val: on });
+    btn.innerText = on ? 'ON' : 'OFF';
+    btn.classList.toggle('toggle-on', on);
+  }
 
-        function updateChart(data) {
-            const time = new Date().toLocaleTimeString();
-            if(chart.data.labels.length > 15) { chart.data.labels.shift(); chart.data.datasets[0].data.shift(); }
-            chart.data.labels.push(time);
-            chart.data.datasets[0].data.push(data.temp_in);
-            chart.update();
-        }
-    </script>
+  // --- Thresholds: validation & send ---
+  function restoreDefaults() {
+    const cache = JSON.parse(localStorage.getItem('bio_defaults') || '{}');
+    document.getElementById('t-temp').value = cache.temp ?? 28;
+    document.getElementById('t-hum').value = cache.hum ?? 75;
+    document.getElementById('t-soil').value = cache.soil ?? 30;
+    document.getElementById('t-npk').value = cache.npk ?? 15;
+    document.getElementById('pulse-ms').value = cache.pulseMs ?? 5000;
+    document.getElementById('npk-check-interval').value = cache.npkInterval ?? 10000;
+  }
+
+  function sendThresholds() {
+    // gather and validate
+    const temp = Number(document.getElementById('t-temp').value);
+    const hum = Number(document.getElementById('t-hum').value);
+    const soil = Number(document.getElementById('t-soil').value);
+    const npk = Number(document.getElementById('t-npk').value);
+    const pulseMs = Number(document.getElementById('pulse-ms').value);
+    const npkInterval = Number(document.getElementById('npk-check-interval').value);
+
+    // Validation with user-friendly constraints
+    if (!Number.isFinite(temp) || temp < 5 || temp > 45) return alert('Temperature threshold must be 5–45°C');
+    if (!Number.isFinite(hum) || hum < 20 || hum > 95) return alert('Humidity threshold must be 20–95%');
+    if (!Number.isFinite(soil) || soil < 0 || soil > 100) return alert('Soil moisture threshold must be 0–100%');
+    if (!Number.isFinite(npk) || npk < 0 || npk > 5000) return alert('NPK (N) threshold must be 0–5000');
+    if (!Number.isFinite(pulseMs) || pulseMs < 1000 || pulseMs > 600000) return alert('Pulse ms must be 1000–600000');
+    if (!Number.isFinite(npkInterval) || npkInterval < 1000 || npkInterval > 600000) return alert('NPK interval must be 1000–600000');
+
+    // Save to local cache
+    localStorage.setItem('bio_defaults', JSON.stringify({ temp, hum, soil, npk, pulseMs, npkInterval }));
+
+    // Send to controller via socket - Arduino expects update_thresholds with val object
+    socket.emit('control_cmd', {
+      cmd: 'update_thresholds',
+      val: { temp: Math.round(temp), hum: Math.round(hum), soil: Math.round(soil), npk: Math.round(npk),
+             pulse_ms: Math.round(pulseMs), npk_interval: Math.round(npkInterval) }
+    });
+
+    alert('Thresholds sent to controller');
+  }
+
+  // --- Admin utilities (frontend) ---
+  async function loadUsers() {
+    try {
+      const res = await fetch('/api/users');
+      const users = await res.json();
+      const tbody = document.querySelector('#user-table tbody');
+      tbody.innerHTML = '';
+      users.forEach(u => {
+        const tr = document.createElement('tr');
+        const status = u.isBanned ? 'Banned' : (u.restricted ? 'Restricted' : 'Active');
+        tr.innerHTML = `
+          <td>${u.username}</td>
+          <td>${u.role}</td>
+          <td>${status}</td>
+          <td>
+            <button class="small-btn" onclick="adminAction('${u.username}','ban')">Ban</button>
+            <button class="small-btn" onclick="adminAction('${u.username}','promote')">Promote</button>
+            <button class="small-btn" onclick="adminAction('${u.username}','restrict')">Toggle Restrict</button>
+          </td>`;
+        tbody.appendChild(tr);
+      });
+    } catch (err) {
+      console.error('Failed loading users', err);
+    }
+  }
+
+  async function adminAction(username, action) {
+    try {
+      const body = { targetUser: username, action };
+      await fetch('/api/admin/action', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+      await loadUsers();
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
+  // --- Utilities ---
+  function downloadExcel() {
+    // opens backend download endpoint (keeps previous button behavior)
+    window.open('/api/download/standard', '_blank');
+  }
+
+</script>
 </body>
 </html>
