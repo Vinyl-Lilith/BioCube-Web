@@ -1,351 +1,385 @@
-<!-- Revamped BioCube UI — single-file index.html
-  - Mobile-first responsive layout
-  - Collapsible sidebar, top bar, clear visual hierarchy
-  - Token-based auth (localStorage) with register/login modal
-  - Socket.io + Chart.js integration (same endpoints as before)
-  - Robust input validation, accessible controls, admin panel
-  - Calls server endpoints using Authorization: Bearer <token>
-  Notes for backend: keep existing endpoints: /api/login, /api/register, /api/users, /api/admin/action, /api/download/standard
-  and socket events: 'feed', 'pi_status', 'update', 'control_cmd'.
--->
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>BioCube — Revamped</title>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer></script>
-  <style>
-    :root{
-      --bg:#0b1220; --card:#0f1724; --muted:#8fa3b2; --accent:#28D39E; --danger:#ff6b6b; --glass: rgba(255,255,255,0.03);
-      --radius:12px; --gap:12px; --max-w:1200px; --txt:#e6eef6;
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{margin:0;font-family:Inter, system-ui, -apple-system,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,#071018,#071526);color:var(--txt);display:flex;justify-content:center;padding:18px}
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BIOCUBE | Core Interface</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --acid-green: #bfff00;
+            --cyber-blue: #00f2ff;
+            --warning-orange: #ff9d00;
+            --danger-red: #ff3c3c;
+            --deep-space: #05070a;
+            --panel-bg: rgba(20, 25, 30, 0.95);
+        }
 
-    .app{width:100%;max-width:var(--max-w);display:grid;grid-template-columns:280px 1fr;gap:var(--gap);min-height:80vh}
+        body {
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--deep-space);
+            color: #e0e0e0;
+            margin: 0;
+            overflow-x: hidden;
+            background-image: linear-gradient(rgba(0, 242, 255, 0.03) 1px, transparent 1px), 
+                              linear-gradient(90deg, rgba(0, 242, 255, 0.03) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
 
-    /* Sidebar */
-    .sidebar{background:linear-gradient(180deg,rgba(255,255,255,0.02), rgba(255,255,255,0.01));border-radius:var(--radius);padding:16px;display:flex;flex-direction:column;gap:14px}
-    .brand{display:flex;gap:12px;align-items:center}
-    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7fffd8);display:flex;align-items:center;justify-content:center;color:#022; font-weight:700}
-    .h{margin:0;font-size:18px}
-    .sub{color:var(--muted);font-size:13px}
-    .nav{display:flex;flex-direction:column;gap:6px;margin-top:6px}
-    .nav button{background:transparent;border:0;color:var(--txt);text-align:left;padding:10px;border-radius:8px;cursor:pointer}
-    .nav button.active{background:linear-gradient(90deg,rgba(40,211,158,0.07),rgba(40,211,158,0.02));border-left:3px solid var(--accent);padding-left:8px}
+        /* --- AUTH SCREEN --- */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100vh;
+            display: flex; align-items: center; justify-content: center;
+            background: radial-gradient(circle at center, #1a202c 0%, #05070a 100%);
+            z-index: 10000;
+        }
+        .terminal-card {
+            background: var(--panel-bg); border: 1px solid var(--acid-green);
+            padding: 40px; border-radius: 5px; box-shadow: 0 0 20px rgba(191, 255, 0, 0.15);
+            width: 90%; max-width: 400px; text-align: center;
+        }
+        .terminal-card h1 { font-family: 'Orbitron'; color: var(--acid-green); letter-spacing: 5px; margin-bottom: 30px; }
 
-    /* Main */
-    .main{display:flex;flex-direction:column;gap:12px}
-    .topbar{display:flex;justify-content:space-between;align-items:center;gap:12px}
-    .search{display:flex;gap:8px;align-items:center}
-    .status{display:flex;gap:10px;align-items:center}
-    .dot{width:10px;height:10px;border-radius:999px;background:#304050}
-    .dot.online{background:var(--accent);box-shadow:0 0 8px rgba(40,211,158,0.15)}
+        input {
+            width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5);
+            border: 1px solid #333; padding: 15px; color: var(--cyber-blue);
+            font-family: 'Rajdhani'; font-size: 1.1rem; margin-bottom: 10px;
+            outline: none; transition: 0.3s;
+        }
+        input:focus { border-color: var(--cyber-blue); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
 
-    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
-    .card{background:var(--card);padding:14px;border-radius:10px;box-shadow:0 6px 20px rgba(2,6,23,0.45);border:1px solid rgba(255,255,255,0.02)}
-    .full{grid-column:1/-1}
+        /* --- NAVIGATION --- */
+        nav {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            background: rgba(5, 7, 10, 0.95); border-top: 1px solid rgba(0, 242, 255, 0.2);
+            display: flex; justify-content: space-around; padding: 10px 0;
+            z-index: 1000; backdrop-filter: blur(10px);
+        }
+        @media (min-width: 768px) {
+            nav { top: 0; bottom: auto; border-top: none; border-bottom: 1px solid rgba(0, 242, 255, 0.2); }
+        }
+        nav button {
+            background: none; border: none; color: #666; font-family: 'Orbitron';
+            font-size: 0.7rem; cursor: pointer; transition: 0.3s; padding: 10px;
+        }
+        nav button.active { color: var(--acid-green); text-shadow: 0 0 10px var(--acid-green); }
 
-    /* Camera */
-    .camera{height:260px;border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center}
-    .camera img{width:100%;height:100%;object-fit:cover}
+        /* --- UI COMPONENTS --- */
+        .app-container { max-width: 1200px; margin: 0 auto; padding: 15px 15px 80px 15px; }
+        @media (min-width: 768px) { .app-container { padding-top: 80px; } }
 
-    /* Controls list */
-    .kv{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px dashed rgba(255,255,255,0.02)}
-    .big{font-size:20px;font-weight:600}
-    .muted{color:var(--muted);font-size:13px}
+        .hud-card {
+            background: var(--panel-bg); border-left: 4px solid var(--cyber-blue);
+            padding: 20px; margin-bottom: 15px; border-radius: 0 10px 10px 0;
+        }
+        .hud-header {
+            font-family: 'Orbitron'; font-size: 0.8rem; color: var(--cyber-blue);
+            margin-bottom: 15px; display: flex; justify-content: space-between;
+        }
 
-    /* Manual controls */
-    .controls{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
-    .btn{padding:8px 12px;border-radius:8px;border:none;background:var(--glass);color:var(--txt);cursor:pointer;font-weight:600}
-    .btn.on{background:linear-gradient(90deg,rgba(40,211,158,0.12),rgba(40,211,158,0.04));color:#012}
-    .disabled{opacity:0.5;pointer-events:none}
+        /* Camera */
+        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        #cam-feed { width: 100%; display: block; transform: rotate(180deg); transition: 0.3s; }
+        #cam-feed.fullscreen { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 9999; object-fit: contain; background: #000; }
 
-    /* Threshold form */
-    form .row{display:flex;gap:8px}
-    input[type=number],input[type=text],input[type=password],select{width:100%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:var(--txt)}
-    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+        /* Sensor Grid */
+        .sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(4, 1fr); } }
+        .sensor-module { 
+            background: rgba(255,255,255,0.03); padding: 15px; text-align: center; 
+            border: 1px solid rgba(255,255,255,0.05); transition: 0.3s;
+        }
+        .sensor-module:hover { border-color: var(--cyber-blue); }
+        .sensor-module .val { font-size: 2.2rem; font-weight: 700; color: #fff; line-height: 1; }
+        .sensor-module label { font-size: 0.7rem; color: var(--cyber-blue); text-transform: uppercase; display: block; margin-bottom: 5px; }
 
-    table{width:100%;border-collapse:collapse}
-    th,td{padding:8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.02)}
+        /* Buttons & Toggles */
+        .btn-master {
+            width: 100%; padding: 15px; font-family: 'Orbitron'; font-weight: bold;
+            border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;
+            text-transform: uppercase;
+        }
+        .btn-master.on { background: var(--acid-green); color: #000; box-shadow: 0 0 15px rgba(191, 255, 0, 0.3); }
+        .btn-master.off { background: #222; color: #fff; }
+        
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #222; }
+        .btn-toggle { padding: 8px 15px; border-radius: 20px; border: 1px solid #444; background: none; color: #fff; font-weight: bold; cursor: pointer; }
+        .btn-toggle.active { background: var(--cyber-blue); color: #000; border-color: var(--cyber-blue); }
 
-    /* Footer small */
-    .foot{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:13px}
-
-    /* Responsive */
-    @media (max-width:980px){
-      .app{grid-template-columns:1fr;padding:8px}
-      .grid{grid-template-columns:1fr}
-      .camera{height:160px}
-      .sidebar{flex-direction:row;align-items:center;justify-content:space-between;padding:10px}
-      .nav button{display:none}
-    }
-  </style>
+        .hidden { display: none !important; }
+        .disabled { opacity: 0.2; pointer-events: none; }
+        
+        /* Admin Table */
+        .admin-table-container { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+        th { color: var(--cyber-blue); text-align: left; padding: 12px; border-bottom: 2px solid #222; }
+        td { padding: 12px; border-bottom: 1px solid #111; }
+    </style>
 </head>
 <body>
-  <div class="app" role="application">
-    <aside class="sidebar" aria-label="Sidebar">
-      <div class="brand">
-        <div class="logo">BC</div>
-        <div>
-          <h3 class="h">BioCube</h3>
-          <div class="sub">Smart greenhouse</div>
-        </div>
-      </div>
 
-      <nav class="nav" aria-label="Main navigation">
-        <button class="active" data-page="dashboard" onclick="navTo(event)">Dashboard</button>
-        <button data-page="automatic" onclick="navTo(event)">Automatic</button>
-        <button data-page="manual" onclick="navTo(event)">Manual</button>
-        <button data-page="logs" onclick="navTo(event)">Logs</button>
-        <button id="admin-btn" style="display:none" data-page="admin" onclick="navTo(event)">Admin</button>
-      </nav>
-
-      <div style="margin-top:auto">
-        <div class="muted">Pi</div>
-        <div style="display:flex;gap:8px;align-items:center;margin-top:6px">
-          <div id="pi-dot" class="dot" aria-hidden></div>
-          <div class="muted" id="pi-uptime">—</div>
-        </div>
-      </div>
-    </aside>
-
-    <main class="main" id="main">
-      <div class="topbar">
-        <div>
-          <div class="muted">Welcome, <strong id="display-user">Guest</strong></div>
-          <div class="muted">Responsive control panel • connected</div>
-        </div>
-        <div class="status">
-          <div class="muted">Connection</div>
-          <div id="conn-dot" class="dot" aria-hidden></div>
-          <button class="btn" id="login-toggle" onclick="openAuth()">Log In</button>
-        </div>
-      </div>
-
-      <!-- Dashboard -->
-      <section id="page-dashboard" class="grid">
-        <div class="card">
-          <h4 style="margin:0 0 8px 0">Live Camera</h4>
-          <div class="camera"><img id="cam" alt="camera feed" src=""/></div>
-          <div style="display:flex;gap:8px;margin-top:8px;justify-content:space-between">
-            <div class="muted">Tap image to enlarge</div>
-            <div><button class="btn" onclick="toggleCam()">Toggle Full</button></div>
-          </div>
-        </div>
-
-        <div class="card">
-          <h4 style="margin:0 0 8px 0">Sensors</h4>
-          <div class="kv"><div>Temperature</div><div id="temp-val" class="big">— °C</div></div>
-          <div class="kv"><div>Humidity</div><div id="hum-val" class="big">— %</div></div>
-          <div class="kv"><div>Soil Moisture</div><div id="soil-val" class="big">— %</div></div>
-          <div class="kv"><div>NPK (N-P-K)</div><div id="npk-val" class="big">— - — - —</div></div>
-          <div class="kv"><div>Mode</div><div id="mode-val" class="big">AUTO</div></div>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <button class="btn" id="toggle-auto" onclick="toggleAuto()">Auto: ON</button>
-            <button class="btn" onclick="download()">Download</button>
-          </div>
-        </div>
-
-        <div class="card full">
-          <h4 style="margin:0 0 8px 0">Trends</h4>
-          <canvas id="chart" style="width:100%;height:220px"></canvas>
-        </div>
-      </section>
-
-      <!-- Automatic -->
-      <section id="page-automatic" class="card hidden">
-        <h4>Automatic Thresholds</h4>
-        <form id="threshold-form" onsubmit="event.preventDefault();applyThresholds();">
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
-            <div>
-              <label for="th-temp">Temperature (°C)</label>
-              <input id="th-temp" type="number" min="5" max="45" required />
+    <div id="auth-screen">
+        <div class="terminal-card">
+            <h1>BIOCUBE</h1>
+            <input type="text" id="username" placeholder="OPERATOR_ID">
+            <input type="password" id="password" placeholder="ACCESS_CODE">
+            <div style="margin-top: 15px;">
+                <button class="btn-master on" onclick="handleAuth('login')">INITIALIZE</button>
+                <button class="btn-master off" style="font-size: 0.7rem;" onclick="handleAuth('register')">NEW REGISTRATION</button>
             </div>
-            <div>
-              <label for="th-hum">Humidity (%)</label>
-              <input id="th-hum" type="number" min="20" max="95" required />
-            </div>
-            <div>
-              <label for="th-soil">Soil Moisture (%)</label>
-              <input id="th-soil" type="number" min="0" max="100" required />
-            </div>
-          </div>
-
-          <div style="margin-top:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:10px">
-            <div>
-              <label for="th-npk">N (NPK)</label>
-              <input id="th-npk" type="number" min="0" max="5000" required />
-            </div>
-            <div>
-              <label for="th-pulse">Pump pulse (ms)</label>
-              <input id="th-pulse" type="number" min="1000" max="600000" required />
-            </div>
-          </div>
-
-          <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px">
-            <button class="btn" type="button" onclick="restoreDefaults()">Restore</button>
-            <button class="btn" type="submit">Save & Apply</button>
-          </div>
-        </form>
-      </section>
-
-      <!-- Manual -->
-      <section id="page-manual" class="card hidden">
-        <h4>Manual Controls</h4>
-        <div class="controls disabled" id="manual-area">
-          <div style="display:flex;gap:8px"><div style="flex:1">Water Pump</div><button class="btn" data-act="water" onclick="manualToggle(event)">OFF</button></div>
-          <div style="display:flex;gap:8px"><div style="flex:1">Nutrient Pump</div><button class="btn" data-act="nutrient" onclick="manualToggle(event)">OFF</button></div>
-          <div style="display:flex;gap:8px"><div style="flex:1">Exhaust Fan</div><button class="btn" data-act="exhaust" onclick="manualToggle(event)">OFF</button></div>
-          <div style="display:flex;gap:8px"><div style="flex:1">Cooling (Peltier)</div><button class="btn" data-act="cool" onclick="manualToggle(event)">OFF</button></div>
+            <p id="auth-msg" style="color:var(--danger-red); margin-top:15px; font-size:0.8rem;"></p>
         </div>
-      </section>
-
-      <!-- Admin -->
-      <section id="page-admin" class="card hidden">
-        <h4>Admin</h4>
-        <table>
-          <thead><tr><th>User</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="users-tbody"></tbody>
-        </table>
-      </section>
-
-      <footer class="card foot full">
-        <div>BioCube • Revamped UI</div>
-        <div class="muted">Server + MongoDB configured on Render (use env variables on server)</div>
-      </footer>
-    </main>
-  </div>
-
-  <!-- Auth modal (simple) -->
-  <div id="auth-modal" style="display:none;position:fixed;inset:0;background:rgba(2,6,23,0.6);align-items:center;justify-content:center;padding:18px">
-    <div style="background:var(--card);padding:18px;border-radius:12px;max-width:420px;width:100%">
-      <h3 id="auth-title">Log In</h3>
-      <form id="auth-form" onsubmit="event.preventDefault();doAuth()">
-        <label for="auth-user">Username</label>
-        <input id="auth-user" type="text" autocomplete="username" required />
-        <label for="auth-pass" style="margin-top:8px">Password</label>
-        <input id="auth-pass" type="password" autocomplete="current-password" required />
-        <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
-          <button class="btn" type="button" onclick="closeAuth()">Cancel</button>
-          <button class="btn" id="auth-submit" type="submit">Submit</button>
-        </div>
-        <div id="auth-msg" class="muted" style="margin-top:8px"></div>
-      </form>
     </div>
-  </div>
 
-  <script>
-    // Client configuration
-    const socket = io();
-    let token = localStorage.getItem('bc_token') || null;
-    let currentUser = null;
+    <div id="app-screen" class="hidden">
+        <nav>
+            <button class="active" onclick="nav('home', this)">STATUS</button>
+            <button onclick="nav('manual', this)">OVERRIDE</button>
+            <button onclick="nav('settings', this)">LOGIC</button>
+            <button id="btn-admin-nav" class="hidden" onclick="nav('admin', this)">ADMIN</button>
+            <button onclick="logout()" style="color:var(--danger-red)">EXIT</button>
+        </nav>
 
-    // Simple page navigation
-    function navTo(e){
-      const page = e.currentTarget?.dataset?.page || e;
-      document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('active', b.dataset.page===page));
-      document.querySelectorAll('section[id^="page-"]').forEach(s => s.classList.add('hidden'));
-      const el = document.getElementById('page-'+page);
-      if(el) el.classList.remove('hidden');
-    }
+        <div class="app-container">
+            
+            <div id="page-home">
+                <div class="hud-card">
+                    <div class="hud-header">
+                        <span>LIVE_FEED_01</span>
+                        <span id="pi-status-tag" style="color:var(--danger-red)">● LINK_DOWN</span>
+                    </div>
+                    <div class="cam-wrapper">
+                        <img id="cam-feed" src="" alt="SIGNAL LOST" ondblclick="toggleFullCam()">
+                    </div>
+                </div>
 
-    // Show auth modal
-    function openAuth(){
-      document.getElementById('auth-title').innerText = token ? 'Re-authenticate' : 'Log In / Register';
-      document.getElementById('auth-modal').style.display = 'flex';
-    }
-    function closeAuth(){ document.getElementById('auth-modal').style.display='none'; }
+                <div class="sensor-grid">
+                    <div class="sensor-module"><label>Temp</label><div class="val" id="v-temp">--</div><span>°C</span></div>
+                    <div class="sensor-module"><label>Humid</label><div class="val" id="v-hum">--</div><span>%</span></div>
+                    <div class="sensor-module"><label>Soil</label><div class="val" id="v-soil">--</div><span>%</span></div>
+                    <div class="sensor-module"><label>NPK</label><div class="val" id="v-npk" style="font-size:1.1rem">--</div></div>
+                </div>
 
-    async function doAuth(){
-      const u = document.getElementById('auth-user').value.trim();
-      const p = document.getElementById('auth-pass').value;
-      if(!u||!p){ document.getElementById('auth-msg').innerText='username & password required'; return; }
-      try{
-        const res = await fetch('/api/login', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});
-        const json = await res.json();
-        if(json.status==='ok'){ token=json.token; localStorage.setItem('bc_token', token); currentUser={username:u,role:json.role||'user'}; document.getElementById('display-user').innerText=u; if(currentUser.role==='admin') document.getElementById('admin-btn').style.display='block'; closeAuth(); loadUsers(); }
-        else{ document.getElementById('auth-msg').innerText=json.error||'auth failed'; }
-      }catch(err){ document.getElementById('auth-msg').innerText='network error'; }
-    }
+                <div class="hud-card" style="margin-top:20px;">
+                    <div class="hud-header">24H_DATA_TREND</div>
+                    <canvas id="sensorChart" style="max-height: 250px;"></canvas>
+                    <button class="btn-master off" style="margin-top:15px; font-size:0.7rem;" onclick="window.open('/api/download/standard')">DOWNLOAD EXCEL LOGS</button>
+                </div>
+            </div>
 
-    // Socket events
-    socket.on('connect', ()=>{document.getElementById('conn-dot').classList.add('online');});
-    socket.on('disconnect', ()=>{document.getElementById('conn-dot').classList.remove('online');});
-    socket.on('feed', (b64)=>{ document.getElementById('cam').src='data:image/jpeg;base64,'+b64; });
-    socket.on('pi_status',(info)=>{ document.getElementById('pi-dot').classList.add('online'); if(info?.uptime) document.getElementById('pi-uptime').innerText=info.uptime; });
-    socket.on('update',(d)=>{ handleUpdate(d); });
+            <div id="page-manual" class="hidden">
+                <div class="hud-card">
+                    <div class="hud-header">HARDWARE_OVERRIDE</div>
+                    <p id="manual-lock-msg" style="color:var(--warning-orange); font-size:0.8rem;">⚠️ AUTO-MODE ACTIVE: COMMANDS REJECTED</p>
+                    <div id="manual-controls" class="disabled">
+                        <div class="toggle-row"><span>Water Pump</span><button class="btn-toggle" onclick="toggleActuator('water', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Nutrient Pump</span><button class="btn-toggle" onclick="toggleActuator('nutrient', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Exhaust Fan</span><button class="btn-toggle" onclick="toggleActuator('exhaust', this)">OFF</button></div>
+                        <div class="toggle-row"><span>Peltier Cooling</span><button class="btn-toggle" onclick="toggleActuator('cool', this)">OFF</button></div>
+                    </div>
+                </div>
+            </div>
 
-    function handleUpdate(d){
-      document.getElementById('temp-val').innerText = (Number.isFinite(d.temp_in)?d.temp_in.toFixed(1):'—') + ' °C';
-      document.getElementById('hum-val').innerText = (Number.isFinite(d.hum_in)?d.hum_in.toFixed(1):'—') + ' %';
-      document.getElementById('soil-val').innerText = (Number.isFinite(d.soil_moisture)?d.soil_moisture:'—') + ' %';
-      document.getElementById('npk-val').innerText = `${d.npk_n??'—'} - ${d.npk_p??'—'} - ${d.npk_k??'—'}`;
-      const am = !!d.auto_mode;
-      document.getElementById('mode-val').innerText = am ? 'AUTO' : 'MANUAL';
-      document.getElementById('toggle-auto').innerText = `Auto: ${am? 'ON':'OFF'}`;
-      document.getElementById('manual-area').classList.toggle('disabled', am);
-      addChartPoints(d);
-    }
+            <div id="page-settings" class="hidden">
+                <div class="hud-card">
+                    <div class="hud-header">SYSTEM_THRESHOLDS</div>
+                    <div class="toggle-row" style="margin-bottom:20px;">
+                        <span>AUTO MODE</span>
+                        <button id="btn-auto-toggle" class="btn-toggle" onclick="toggleAuto()">OFF</button>
+                    </div>
+                    
+                    <div class="input-group">
+                        <div class="toggle-row">
+                            <span>Peltier (Temp > X°C)</span>
+                            <input type="number" id="th-temp" value="28" style="width:60px;">
+                        </div>
+                        <div class="toggle-row">
+                            <span>Exhaust (Humid > X%)</span>
+                            <input type="number" id="th-hum" value="70" style="width:60px;">
+                        </div>
+                        <div class="toggle-row">
+                            <span>Water (Soil < X%)</span>
+                            <input type="number" id="th-soil" value="30" style="width:60px;">
+                        </div>
+                        <button class="btn-master on" onclick="updateThresholds()">SYNC TO ARDUINO</button>
+                    </div>
+                </div>
+            </div>
 
-    // Chart
-    let chart=null; const maxPoints=48;
-    function setupChart(){
-      const ctx = document.getElementById('chart').getContext('2d');
-      chart=new Chart(ctx,{type:'line',data:{labels:[],datasets:[{label:'Temp',data:[],tension:0.3},{label:'Soil',data:[],tension:0.3}]},options:{responsive:true,maintainAspectRatio:false}});
-    }
-    function addChartPoints(d){
-      if(!chart) return; const t=new Date().toLocaleTimeString(); const ds=chart.data; if(ds.labels.length>=maxPoints){ ds.labels.shift(); ds.datasets.forEach(s=>s.data.shift()); }
-      ds.labels.push(t); ds.datasets[0].data.push(Number(d.temp_in??NaN)); ds.datasets[1].data.push(Number(d.soil_moisture??NaN)); chart.update();
-    }
+            <div id="page-admin" class="hidden">
+                <div class="hud-card">
+                    <div class="hud-header">OPERATOR_MANAGEMENT</div>
+                    <div class="admin-table-container">
+                        <table>
+                            <thead>
+                                <tr><th>USER</th><th>ROLE</th><th>RESTRICTIONS</th><th>ACTION</th></tr>
+                            </thead>
+                            <tbody id="admin-user-list"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
 
-    // Controls: Auto
-    function toggleAuto(){ const newState = (document.getElementById('toggle-auto').innerText.indexOf('ON')===-1); socket.emit('control_cmd',{cmd:'set_auto',val:newState}); }
+        </div>
+    </div>
 
-    // Manual toggles
-    function manualToggle(e){ const btn=e.currentTarget; if(document.getElementById('manual-area').classList.contains('disabled')) return; const act=btn.dataset.act; const turningOn = btn.innerText==='OFF'; socket.emit('control_cmd',{cmd:act,val:turningOn}); btn.innerText = turningOn ? 'ON':'OFF'; btn.classList.toggle('on',turningOn); }
+    <script>
+        const socket = io();
+        let isAuto = true;
+        let myRole = 'operator';
 
-    // Thresholds
-    function restoreDefaults(){ document.getElementById('th-temp').value=28; document.getElementById('th-hum').value=75; document.getElementById('th-soil').value=30; document.getElementById('th-npk').value=15; document.getElementById('th-pulse').value=5000; }
-    function applyThresholds(){
-      const t=Number(document.getElementById('th-temp').value);
-      const h=Number(document.getElementById('th-hum').value);
-      const s=Number(document.getElementById('th-soil').value);
-      const n=Number(document.getElementById('th-npk').value);
-      const p=Number(document.getElementById('th-pulse').value);
-      if(!Number.isFinite(t)||t<5||t>45) return alert('Temperature 5–45°C');
-      if(!Number.isFinite(h)||h<20||h>95) return alert('Humidity 20–95%');
-      if(!Number.isFinite(s)||s<0||s>100) return alert('Soil 0–100%');
-      if(!Number.isFinite(n)||n<0||n>5000) return alert('N 0–5000');
-      if(!Number.isFinite(p)||p<1000||p>600000) return alert('Pulse ms 1000–600000');
-      socket.emit('control_cmd',{cmd:'update_thresholds',val:{temp:Math.round(t),hum:Math.round(h),soil:Math.round(s),npk:Math.round(n),pulse_ms:Math.round(p),npk_interval:10000}});
-      alert('Thresholds sent');
-    }
+        // --- AUTHENTICATION ---
+        async function handleAuth(type) {
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            const res = await fetch(`/api/${type}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({username: u, password: p})
+            });
+            const data = await res.json();
+            if(data.status === 'ok') {
+                if(type === 'login') {
+                    localStorage.setItem('token', data.token);
+                    myRole = data.role;
+                    document.getElementById('auth-screen').classList.add('hidden');
+                    document.getElementById('app-screen').classList.remove('hidden');
+                    if(myRole === 'admin') document.getElementById('btn-admin-nav').classList.remove('hidden');
+                } else {
+                    alert("Operator Registered. Access Granted.");
+                }
+            } else {
+                document.getElementById('auth-msg').innerText = data.error.toUpperCase();
+            }
+        }
 
-    // Admin
-    async function loadUsers(){ if(!token) return; try{ const res=await fetch('/api/users',{headers:{'Authorization':'Bearer '+token}}); if(!res.ok) throw new Error('failed'); const users=await res.json(); const tbody=document.getElementById('users-tbody'); tbody.innerHTML=''; users.forEach(u=>{ const tr=document.createElement('tr'); const status=u.isBanned? 'Banned': (u.restricted? 'Restricted':'Active'); tr.innerHTML=`<td>${u.username}</td><td>${u.role}</td><td>${status}</td><td><button class=\"btn\" onclick=\"adminAction('${u.username}','ban')\">Ban</button> <button class=\"btn\" onclick=\"adminAction('${u.username}','promote')\">Promote</button> <button class=\"btn\" onclick=\"adminAction('${u.username}','restrict')\">Toggle Restrict</button></td>`; tbody.appendChild(tr); }); }catch(e){ console.error(e); }}
-    async function adminAction(user,action){ if(!token) return alert('login required'); try{ await fetch('/api/admin/action',{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({targetUser:user,action})}); await loadUsers(); }catch(e){console.error(e);} }
+        function logout() { localStorage.removeItem('token'); location.reload(); }
 
-    // Download
-    function download(){ window.open('/api/download/standard','_blank'); }
+        // --- NAVIGATION ---
+        function nav(page, btn) {
+            document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
+            document.getElementById(`page-${page}`).classList.remove('hidden');
+            btn.classList.add('active');
+            if(page === 'admin') loadAdminData();
+        }
 
-    // Camera full
-    function toggleCam(){ const img=document.getElementById('cam'); img.classList.toggle('fullscreen'); }
+        // --- SOCKETS ---
+        socket.on('feed', (data) => { document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data; });
+        
+        socket.on('pi_status', () => {
+            const tag = document.getElementById('pi-status-tag');
+            tag.innerText = "● LINK_ACTIVE"; tag.style.color = "var(--acid-green)";
+        });
 
-    // init
-    document.addEventListener('DOMContentLoaded',()=>{ setupChart(); restoreDefaults(); // show dashboard
-      navTo('dashboard'); // attempt to populate user from token
-      if(localStorage.getItem('bc_token')){ token=localStorage.getItem('bc_token'); /* optionally fetch profile */ }
-      // heartbeat to backend via socket
-      setInterval(()=>socket.emit('control_cmd',{cmd:'heartbeat'}),5000);
-    });
+        socket.on('update', (data) => {
+            document.getElementById('v-temp').innerText = data.temp_in.toFixed(1);
+            document.getElementById('v-hum').innerText = data.hum_in.toFixed(1);
+            document.getElementById('v-soil').innerText = data.soil_moisture;
+            document.getElementById('v-npk').innerText = `${data.npk_n}-${data.npk_p}-${data.npk_k}`;
+            
+            isAuto = data.auto_mode;
+            const autoBtn = document.getElementById('btn-auto-toggle');
+            const manualDiv = document.getElementById('manual-controls');
+            const lockMsg = document.getElementById('manual-lock-msg');
 
-    // small helper: open admin page when admin
-    async function loadUsersOnRole(){ if(token){ try{ const res = await fetch('/api/profile',{headers:{'Authorization':'Bearer '+token}}); if(res.ok){ const p=await res.json(); if(p.role==='admin'){ document.getElementById('admin-btn').style.display='block'; loadUsers(); } } }catch(e){} }}
+            autoBtn.innerText = isAuto ? "ON" : "OFF";
+            autoBtn.className = isAuto ? "btn-toggle active" : "btn-toggle";
+            
+            if(isAuto) { manualDiv.classList.add('disabled'); lockMsg.classList.remove('hidden'); }
+            else { manualDiv.classList.remove('disabled'); lockMsg.classList.add('hidden'); }
+            
+            updateChart(data);
+        });
 
-  </script>
+        // --- CONTROLS & THRESHOLDS ---
+        function toggleFullCam() { document.getElementById('cam-feed').classList.toggle('fullscreen'); }
+        function toggleAuto() { socket.emit('control_cmd', { cmd: 'set_auto', val: !isAuto }); }
+        
+        function toggleActuator(name, btn) {
+            const turnOn = btn.innerText === "OFF";
+            socket.emit('control_cmd', { cmd: name, val: turnOn });
+            btn.innerText = turnOn ? "ON" : "OFF";
+            btn.classList.toggle('active');
+        }
+
+        function updateThresholds() {
+            const t = parseInt(document.getElementById('th-temp').value);
+            const h = parseInt(document.getElementById('th-hum').value);
+            const s = parseInt(document.getElementById('th-soil').value);
+            
+            if(isNaN(t) || isNaN(h) || isNaN(s)) return alert("INVALID DATA");
+            
+            socket.emit('control_cmd', { 
+                cmd: 'update_thresholds', 
+                val: { temp: t, humid: h, soil: s } 
+            });
+            alert("THRESHOLDS SYNCED TO CORE");
+        }
+
+        // --- ADMIN MANAGEMENT ---
+        async function loadAdminData() {
+            const res = await fetch('/api/users');
+            const users = await res.json();
+            const tbody = document.getElementById('admin-user-list');
+            tbody.innerHTML = '';
+            users.forEach(u => {
+                tbody.innerHTML += `<tr>
+                    <td>${u.username}</td>
+                    <td>${u.role}</td>
+                    <td>
+                        <small>MANUAL: ${u.canManual ? 'YES' : 'NO'}</small><br>
+                        <small>AUTO: ${u.canEditAuto ? 'YES' : 'NO'}</small>
+                    </td>
+                    <td>
+                        <button onclick="adminAction('${u.username}', 'ban')" style="color:red; background:none; border:none;">BAN</button>
+                        <button onclick="adminAction('${u.username}', 'promote')" style="color:var(--cyber-blue); background:none; border:none; margin-left:10px;">PROMOTE</button>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        async function adminAction(targetUser, action) {
+            await fetch('/api/admin/action', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({targetUser, action})
+            });
+            loadAdminData();
+        }
+
+        // --- CHARTING ---
+        const ctx = document.getElementById('sensorChart').getContext('2d');
+        const chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [
+                    { label: 'Temp', data: [], borderColor: '#00f2ff', tension: 0.4 },
+                    { label: 'Soil', data: [], borderColor: '#bfff00', tension: 0.4 }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: { y: { grid: { color: '#222' } }, x: { grid: { display: false } } }
+            }
+        });
+
+        function updateChart(data) {
+            const time = new Date().toLocaleTimeString();
+            if(chart.data.labels.length > 20) {
+                chart.data.labels.shift();
+                chart.data.datasets[0].data.shift();
+                chart.data.datasets[1].data.shift();
+            }
+            chart.data.labels.push(time);
+            chart.data.datasets[0].data.push(data.temp_in);
+            chart.data.datasets[1].data.push(data.soil_moisture);
+            chart.update();
+        }
+    </script>
 </body>
 </html>
