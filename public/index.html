@@ -69,16 +69,58 @@
         .app-container { max-width: 1200px; margin: 0 auto; padding: 15px 15px 80px 15px; }
         @media (min-width: 768px) { .app-container { padding-top: 80px; } }
 
+        /* --- HUD CARDS & HELP --- */
         .hud-card {
             background: var(--panel-bg); border-left: 4px solid var(--cyber-blue);
             padding: 20px; margin-bottom: 15px; border-radius: 0 10px 10px 0;
+            position: relative;
         }
         .hud-header {
             font-family: 'Orbitron'; font-size: 0.8rem; color: var(--cyber-blue);
-            margin-bottom: 15px; display: flex; justify-content: space-between;
+            margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
+        }
+        
+        /* Help Icon Styling */
+        .help-icon {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 24px; height: 24px; border: 1px solid var(--cyber-blue);
+            border-radius: 50%; color: var(--cyber-blue); cursor: pointer;
+            font-size: 14px; font-weight: bold; margin-left: 10px;
+        }
+        .help-modal {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.95); border: 1px solid var(--acid-green);
+            padding: 20px; width: 80%; max-width: 400px; z-index: 10001;
+            color: #fff; border-radius: 8px; display: none;
+        }
+        .help-modal h3 { color: var(--acid-green); margin-top: 0; font-family: 'Orbitron'; }
+        .help-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.8); z-index: 10000; display: none;
         }
 
-        /* --- SENSOR DISPLAY --- */
+        /* --- CAMERA --- */
+        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
+        #cam-feed { width: 100%; display: block; transform: rotate(180deg); transition: 0.3s; cursor: zoom-in; }
+        
+        /* Fullscreen Camera Mode */
+        .cam-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.95); z-index: 11000;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s;
+        }
+        .cam-overlay.active { opacity: 1; pointer-events: all; }
+        .cam-overlay img {
+            max-width: 100%; max-height: 100%; transform: rotate(180deg);
+            object-fit: contain;
+        }
+        .close-cam {
+            position: absolute; top: 20px; right: 20px;
+            background: var(--danger-red); color: white; border: none;
+            padding: 10px 20px; font-weight: bold; cursor: pointer; border-radius: 5px;
+        }
+
+        /* --- SENSOR GRID --- */
         .sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
         @media (min-width: 768px) { .sensor-grid { grid-template-columns: repeat(3, 1fr); } }
         
@@ -89,11 +131,7 @@
         .sensor-module:hover { border-color: var(--cyber-blue); }
         .sensor-module .val { font-size: 2.2rem; font-weight: 700; color: #fff; line-height: 1; }
         .sensor-module label { font-size: 0.7rem; color: var(--cyber-blue); text-transform: uppercase; display: block; margin-bottom: 5px; }
-        
-        .npk-box { border-left: 2px solid var(--acid-green); }
-
-        .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
-        #cam-feed { width: 100%; display: block; transform: rotate(180deg); }
+        .sensor-module.npk-box { border-left: 2px solid var(--acid-green); }
 
         .btn-master {
             width: 100%; padding: 15px; font-family: 'Orbitron'; font-weight: bold;
@@ -130,6 +168,18 @@
         </div>
     </div>
 
+    <div id="cam-overlay" class="cam-overlay">
+        <button class="close-cam" onclick="closeFullCam()">CLOSE VIEW [X]</button>
+        <img id="cam-feed-full" src="" alt="STREAM">
+    </div>
+
+    <div id="help-overlay" class="help-overlay" onclick="closeHelp()"></div>
+    <div id="help-modal" class="help-modal">
+        <h3 id="help-title">SYSTEM HELP</h3>
+        <p id="help-text" style="line-height: 1.6; font-size: 0.9rem;"></p>
+        <button class="btn-master off" style="margin-top:15px; padding:10px;" onclick="closeHelp()">ACKNOWLEDGE</button>
+    </div>
+
     <div id="app-screen" class="hidden">
         <nav>
             <button class="active" onclick="nav('home', this)">STATUS</button>
@@ -145,11 +195,15 @@
                 <div class="hud-card">
                     <div class="hud-header">
                         <span>LIVE_FEED_01</span>
-                        <span id="pi-status-tag" style="color:var(--danger-red)">● LINK_DOWN</span>
+                        <div style="display:flex; align-items:center;">
+                            <span id="pi-status-tag" style="color:var(--danger-red); margin-right:10px;">● LINK_DOWN</span>
+                            <span class="help-icon" onclick="showHelp('home')">?</span>
+                        </div>
                     </div>
                     <div class="cam-wrapper">
-                        <img id="cam-feed" src="" alt="SIGNAL LOST">
+                        <img id="cam-feed" src="" alt="SIGNAL LOST" ondblclick="openFullCam()">
                     </div>
+                    <p style="text-align:center; font-size:0.7rem; color:#666; margin-top:5px;">DOUBLE TAP VIDEO TO EXPAND</p>
                 </div>
 
                 <div class="sensor-grid">
@@ -173,7 +227,10 @@
 
             <div id="page-manual" class="hidden">
                 <div class="hud-card">
-                    <div class="hud-header">HARDWARE_OVERRIDE</div>
+                    <div class="hud-header">
+                        HARDWARE_OVERRIDE
+                        <span class="help-icon" onclick="showHelp('manual')">?</span>
+                    </div>
                     <p id="manual-lock-msg" style="color:var(--warning-orange); font-size:0.8rem;">⚠️ AUTO-MODE ACTIVE: COMMANDS REJECTED</p>
                     <div id="manual-controls" class="disabled">
                         <div class="toggle-row"><span>Water Pump</span><button class="btn-toggle" onclick="toggleActuator('water', this)">OFF</button></div>
@@ -186,7 +243,10 @@
 
             <div id="page-settings" class="hidden">
                 <div class="hud-card">
-                    <div class="hud-header">SYSTEM_LOGIC_CONFIGURATION</div>
+                    <div class="hud-header">
+                        SYSTEM_LOGIC_CONFIGURATION
+                        <span class="help-icon" onclick="showHelp('settings')">?</span>
+                    </div>
                     <div class="toggle-row" style="margin-bottom:20px;">
                         <span>AUTOMATION ENGINE</span>
                         <button id="btn-auto-toggle" class="btn-toggle" onclick="toggleAuto()">OFF</button>
@@ -207,11 +267,16 @@
 
             <div id="page-admin" class="hidden">
                 <div class="hud-card">
-                    <div class="hud-header">OPERATOR_MANAGEMENT</div>
-                    <table>
-                        <thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
-                        <tbody id="admin-user-list"></tbody>
-                    </table>
+                    <div class="hud-header">
+                        OPERATOR_MANAGEMENT
+                        <span class="help-icon" onclick="showHelp('admin')">?</span>
+                    </div>
+                    <div class="admin-table-container">
+                        <table>
+                            <thead><tr><th>USER</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th></tr></thead>
+                            <tbody id="admin-user-list"></tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -259,13 +324,46 @@
             }
         }
 
-        // --- NAVIGATION ---
+        // --- NAVIGATION & UI HELPERS ---
         function nav(page, btn) {
             document.querySelectorAll('[id^="page-"]').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('nav button').forEach(el => el.classList.remove('active'));
             document.getElementById(`page-${page}`).classList.remove('hidden');
             btn.classList.add('active');
             if(page === 'admin') loadAdminData();
+        }
+
+        // Help System Logic
+        const helpTexts = {
+            'home': "STATUS DASHBOARD:<br>Monitors live environment data. Includes real-time camera feed and NPK nutrient tracking. Data Export allows downloading Excel-ready CSV files.",
+            'manual': "HARDWARE OVERRIDE:<br>Directly control relays (Pumps, Fans, Coolers). <br>NOTE: You MUST disable Automation in the Logic tab before controls become active.",
+            'settings': "SYSTEM LOGIC:<br>Set the trigger points for automation. For example, if Temp > 28°C, the cooling system activates. NPK values determine nutrient dosing.",
+            'admin': "ADMIN PANEL:<br>Manage user access. Promote operators to Admins, ban bad actors, or delete accounts entirely."
+        };
+
+        function showHelp(page) {
+            document.getElementById('help-title').innerText = page.toUpperCase() + " GUIDE";
+            document.getElementById('help-text').innerHTML = helpTexts[page];
+            document.getElementById('help-overlay').style.display = 'block';
+            document.getElementById('help-modal').style.display = 'block';
+        }
+
+        function closeHelp() {
+            document.getElementById('help-overlay').style.display = 'none';
+            document.getElementById('help-modal').style.display = 'none';
+        }
+
+        // Camera Zoom Logic
+        function openFullCam() {
+            const overlay = document.getElementById('cam-overlay');
+            const mainImg = document.getElementById('cam-feed');
+            const fullImg = document.getElementById('cam-feed-full');
+            fullImg.src = mainImg.src; // Sync source immediately
+            overlay.classList.add('active');
+        }
+
+        function closeFullCam() {
+            document.getElementById('cam-overlay').classList.remove('active');
         }
 
         // --- SOCKETS & DATA ---
@@ -293,7 +391,12 @@
         });
 
         socket.on('feed', (data) => {
-            document.getElementById('cam-feed').src = 'data:image/jpeg;base64,' + data;
+            const src = 'data:image/jpeg;base64,' + data;
+            document.getElementById('cam-feed').src = src;
+            // If fullscreen is open, update it too
+            if(document.getElementById('cam-overlay').classList.contains('active')) {
+                document.getElementById('cam-feed-full').src = src;
+            }
         });
 
         socket.on('pi_status', (data) => {
