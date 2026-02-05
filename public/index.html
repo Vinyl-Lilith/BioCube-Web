@@ -343,6 +343,20 @@
                             <tbody id="admin-user-list"></tbody>
                         </table>
                     </div>
+
+                    <!-- Fake sensor data control (admin only) -->
+                    <div style="margin-top:15px; border-top:1px solid #222; padding-top:12px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="font-size:0.8rem; color:var(--cyber-blue); font-family:Orbitron;">SENSOR MODE</div>
+                                <div style="font-size:0.9rem;">Enable simulated sensor output</div>
+                            </div>
+                            <div>
+                                <button id="btn-fake-toggle" class="btn-toggle" onclick="toggleFake()">OFF</button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
@@ -353,6 +367,21 @@
         const socket = io();
         let isAuto = true;
         let myRole = 'operator';
+
+        // --- FAKE SENSOR MODE STATE ---
+        let useFakeSensors = false;
+        let fakeInterval = null;
+        let fakeState = {
+            temp: 0,
+            hum: 0,
+            soil: 0,
+            n: 0,
+            p: 0,
+            k: 0
+        };
+
+        // smoothing factor to make changes gradual
+        const SMOOTH = 0.7; // 0..1 where 1 = no smoothing
 
         // --- AUDIO SYSTEM LOGIC ---
         const audioPlayer = document.getElementById('bgm-player');
@@ -510,27 +539,42 @@
         }
 
         // --- SOCKETS & DATA ---
+        let lastRealData = null; // keep last server-sent data if needed
+
         socket.on('update', (data) => {
-            document.getElementById('v-temp').innerText = data.temp_in?.toFixed(1) || "--";
-            document.getElementById('v-hum').innerText = data.hum_in?.toFixed(1) || "--";
-            document.getElementById('v-soil').innerText = data.soil_moisture || "--";
-            
-            // Individual NPK updates
-            document.getElementById('v-n').innerText = data.npk_n || "0";
-            document.getElementById('v-p').innerText = data.npk_p || "0";
-            document.getElementById('v-k').innerText = data.npk_k || "0";
-            
+            // always keep server data as canonical when not simulating
+            lastRealData = data;
+
+            // update mode & ui bits that should always reflect server
             isAuto = data.auto_mode;
             const autoBtn = document.getElementById('btn-auto-toggle');
             autoBtn.innerText = isAuto ? "ON" : "OFF";
             autoBtn.className = isAuto ? "btn-toggle active" : "btn-toggle";
-            
             const manualDiv = document.getElementById('manual-controls');
             const lockMsg = document.getElementById('manual-lock-msg');
             if(isAuto) { manualDiv.classList.add('disabled'); lockMsg.classList.remove('hidden'); }
             else { manualDiv.classList.remove('disabled'); lockMsg.classList.add('hidden'); }
 
-            updateChart(data);
+            // Update thresholds values in UI so fake mode can use them
+            // (do not overwrite user edits if the element is focused)
+            ['th-temp','th-hum','th-soil','th-n','th-p','th-k'].forEach(id => {
+                const el = document.getElementById(id);
+                if(el && document.activeElement !== el) {
+                    // maintain existing value unless server provides something meaningful
+                    // we'll not stomp on operator inputs
+                }
+            });
+
+            // If not faking, show server values
+            if(!useFakeSensors) {
+                document.getElementById('v-temp').innerText = data.temp_in?.toFixed(1) || "--";
+                document.getElementById('v-hum').innerText = data.hum_in?.toFixed(1) || "--";
+                document.getElementById('v-soil').innerText = data.soil_moisture || "--";
+                document.getElementById('v-n').innerText = data.npk_n || "0";
+                document.getElementById('v-p').innerText = data.npk_p || "0";
+                document.getElementById('v-k').innerText = data.npk_k || "0";
+                updateChart(data);
+            }
         });
 
         socket.on('feed', (data) => {
@@ -571,6 +615,11 @@
             };
             socket.emit('control_cmd', { cmd: 'update_thresholds', val: vals });
             alert("BIOCUBE LOGIC UPDATED");
+
+            // If using fake sensors, update base values right away
+            if(useFakeSensors) {
+                initializeFakeFromThresholds();
+            }
         }
 
         // --- ADMIN FUNCTIONS ---
@@ -634,12 +683,115 @@
                 sensorChart.data.datasets[1].data.shift();
             }
             sensorChart.data.labels.push(time);
-            sensorChart.data.datasets[0].data.push(data.temp_in);
-            sensorChart.data.datasets[1].data.push(data.soil_moisture);
+            sensorChart.data.datasets[0].data.push(Number((data.temp_in||0).toFixed(2)));
+            sensorChart.data.datasets[1].data.push(Number((data.soil_moisture||0).toFixed(2)));
             sensorChart.update();
         }
 
         function logout() { localStorage.removeItem('token'); location.reload(); }
+
+        // --- FAKE SENSOR GENERATION ---
+        function toggleFake() {
+            useFakeSensors = !useFakeSensors;
+            const btn = document.getElementById('btn-fake-toggle');
+            btn.innerText = useFakeSensors ? 'ON' : 'OFF';
+            btn.classList.toggle('active', useFakeSensors);
+
+            if(useFakeSensors) startFakeData();
+            else stopFakeData();
+        }
+
+        function initializeFakeFromThresholds() {
+            // Use thresholds as base values so fake data respects configured targets
+            const t = parseFloat(document.getElementById('th-temp').value) || (lastRealData?.temp_in || 25);
+            const h = parseFloat(document.getElementById('th-hum').value) || (lastRealData?.hum_in || 60);
+            const s = parseFloat(document.getElementById('th-soil').value) || (lastRealData?.soil_moisture || 40);
+            const n = parseFloat(document.getElementById('th-n').value) || (lastRealData?.npk_n || 50);
+            const p = parseFloat(document.getElementById('th-p').value) || (lastRealData?.npk_p || 30);
+            const k = parseFloat(document.getElementById('th-k').value) || (lastRealData?.npk_k || 40);
+
+            // initialize fake state near thresholds but not exactly identical to avoid robotic output
+            fakeState.temp = t + (Math.random() * 1.2 - 0.6);
+            fakeState.hum = h + (Math.random() * 2.5 - 1.25);
+            fakeState.soil = s + (Math.random() * 3 - 1.5);
+            fakeState.n = Math.max(0, Math.round(n + (Math.random() * 4 - 2)));
+            fakeState.p = Math.max(0, Math.round(p + (Math.random() * 3 - 1.5)));
+            fakeState.k = Math.max(0, Math.round(k + (Math.random() * 3 - 1.5)));
+        }
+
+        function startFakeData() {
+            // if server data exists, seed from that; otherwise seed from thresholds
+            initializeFakeFromThresholds();
+
+            if(fakeInterval) clearInterval(fakeInterval);
+            fakeInterval = setInterval(() => {
+                // gentle random walk towards threshold base
+                const tBase = parseFloat(document.getElementById('th-temp').value) || (lastRealData?.temp_in || 25);
+                const hBase = parseFloat(document.getElementById('th-hum').value) || (lastRealData?.hum_in || 60);
+                const sBase = parseFloat(document.getElementById('th-soil').value) || (lastRealData?.soil_moisture || 40);
+                const nBase = parseFloat(document.getElementById('th-n').value) || (lastRealData?.npk_n || 50);
+                const pBase = parseFloat(document.getElementById('th-p').value) || (lastRealData?.npk_p || 30);
+                const kBase = parseFloat(document.getElementById('th-k').value) || (lastRealData?.npk_k || 40);
+
+                // temperature: aim near threshold but fluctuate slightly
+                const tNoise = (Math.random() * 0.8 - 0.4);
+                fakeState.temp = (SMOOTH * fakeState.temp) + ((1 - SMOOTH) * (tBase + tNoise));
+
+                // humidity
+                const hNoise = (Math.random() * 2 - 1);
+                fakeState.hum = (SMOOTH * fakeState.hum) + ((1 - SMOOTH) * (hBase + hNoise));
+
+                // soil moisture: slower changes
+                const sNoise = (Math.random() * 2 - 1);
+                fakeState.soil = (SMOOTH * fakeState.soil) + ((1 - SMOOTH) * (sBase + sNoise));
+
+                // NPK: integer-ish with minor jitter
+                fakeState.n = Math.round((SMOOTH * fakeState.n) + ((1 - SMOOTH) * (nBase + Math.random() * 2 - 1)));
+                fakeState.p = Math.round((SMOOTH * fakeState.p) + ((1 - SMOOTH) * (pBase + Math.random() * 1.5 - 0.75)));
+                fakeState.k = Math.round((SMOOTH * fakeState.k) + ((1 - SMOOTH) * (kBase + Math.random() * 1.5 - 0.75)));
+
+                // clamp
+                fakeState.temp = Number(fakeState.temp.toFixed(1));
+                fakeState.hum = Number(Math.max(0, Math.min(100, fakeState.hum)).toFixed(1));
+                fakeState.soil = Number(Math.max(0, Math.min(100, fakeState.soil)).toFixed(1));
+                fakeState.n = Math.max(0, fakeState.n);
+                fakeState.p = Math.max(0, fakeState.p);
+                fakeState.k = Math.max(0, fakeState.k);
+
+                // push to UI
+                document.getElementById('v-temp').innerText = fakeState.temp.toFixed(1);
+                document.getElementById('v-hum').innerText = fakeState.hum.toFixed(1);
+                document.getElementById('v-soil').innerText = fakeState.soil.toFixed(1);
+                document.getElementById('v-n').innerText = fakeState.n;
+                document.getElementById('v-p').innerText = fakeState.p;
+                document.getElementById('v-k').innerText = fakeState.k;
+
+                // update chart with a data-like object so existing chart code works
+                updateChart({ temp_in: fakeState.temp, soil_moisture: fakeState.soil });
+            }, 1500); // every 1.5s
+        }
+
+        function stopFakeData() {
+            if(fakeInterval) {
+                clearInterval(fakeInterval);
+                fakeInterval = null;
+            }
+
+            // when turning fake off, immediately show last real data if available
+            if(lastRealData) {
+                document.getElementById('v-temp').innerText = lastRealData.temp_in?.toFixed(1) || "--";
+                document.getElementById('v-hum').innerText = lastRealData.hum_in?.toFixed(1) || "--";
+                document.getElementById('v-soil').innerText = lastRealData.soil_moisture || "--";
+                document.getElementById('v-n').innerText = lastRealData.npk_n || "0";
+                document.getElementById('v-p').innerText = lastRealData.npk_p || "0";
+                document.getElementById('v-k').innerText = lastRealData.npk_k || "0";
+                updateChart(lastRealData);
+            }
+        }
+
+        // --- INITIALIZATION: keep code integrity ---
+        // no changes to socket event names or server API expectations
+
     </script>
 </body>
 </html>
