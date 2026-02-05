@@ -383,6 +383,9 @@
         // smoothing factor to make changes gradual
         const SMOOTH = 0.7; // 0..1 where 1 = no smoothing
 
+        // --- PERSISTED STATE KEY ---
+        const STATE_KEY = 'biocube_state_v1';
+
         // --- AUDIO SYSTEM LOGIC ---
         const audioPlayer = document.getElementById('bgm-player');
         let isPlaying = false;
@@ -425,6 +428,79 @@
         audioPlayer.src = playlist['t01'];
         audioPlayer.volume = 0.5;
 
+        // --- PERSIST/LOAD STATE HELPERS ---
+        function saveState() {
+            const state = {
+                bgm_playing: isPlaying,
+                bgm_track: document.getElementById('track-select').value,
+                bgm_volume: Number(document.getElementById('vol-slider').value),
+                fake_enabled: useFakeSensors
+            };
+            try { localStorage.setItem(STATE_KEY, JSON.stringify(state)); } catch(e){ console.warn('Unable to save state', e); }
+        }
+
+        function loadState() {
+            try {
+                const raw = localStorage.getItem(STATE_KEY);
+                if(!raw) return null;
+                return JSON.parse(raw);
+            } catch(e){ console.warn('Unable to read state', e); return null; }
+        }
+
+        function applyPersistedState() {
+            const s = loadState();
+            if(!s) return;
+
+            // audio
+            if(s.bgm_track && playlist[s.bgm_track]) {
+                document.getElementById('track-select').value = s.bgm_track;
+                audioPlayer.src = playlist[s.bgm_track];
+            }
+            if(typeof s.bgm_volume === 'number') {
+                document.getElementById('vol-slider').value = s.bgm_volume;
+                audioPlayer.volume = s.bgm_volume;
+            }
+
+            if(s.bgm_playing) {
+                // try to resume play — may be blocked by browser if user hasn't interacted
+                const playPromise = audioPlayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        isPlaying = true;
+                        const btn = document.getElementById('btn-audio-toggle');
+                        btn.innerText = 'ON';
+                        btn.classList.add('active');
+                    }).catch(err => {
+                        // Play blocked, reflect saved state in UI but don't force.
+                        isPlaying = false;
+                        const btn = document.getElementById('btn-audio-toggle');
+                        btn.innerText = 'OFF';
+                        btn.classList.remove('active');
+                        console.log('Autoplay blocked:', err);
+                    });
+                }
+            } else {
+                // explicitly mark as off
+                isPlaying = false;
+                const btn = document.getElementById('btn-audio-toggle');
+                btn.innerText = 'OFF';
+                btn.classList.remove('active');
+            }
+
+            // fake sensors
+            if(s.fake_enabled) {
+                useFakeSensors = true;
+                const btn = document.getElementById('btn-fake-toggle');
+                btn.innerText = 'ON';
+                btn.classList.add('active');
+                startFakeData();
+            } else {
+                useFakeSensors = false;
+                const btn = document.getElementById('btn-fake-toggle');
+                if(btn) { btn.innerText = 'OFF'; btn.classList.remove('active'); }
+            }
+        }
+
         function toggleAudio() {
             const btn = document.getElementById('btn-audio-toggle');
             if (isPlaying) {
@@ -432,6 +508,7 @@
                 btn.innerText = "OFF";
                 btn.classList.remove('active');
                 isPlaying = false;
+                saveState();
             } else {
                 const playPromise = audioPlayer.play();
                 if (playPromise !== undefined) {
@@ -439,8 +516,9 @@
                         btn.innerText = "ON";
                         btn.classList.add('active');
                         isPlaying = true;
+                        saveState();
                     }).catch(error => {
-                        console.log("Audio Error: File not found or blocked.");
+                        console.log("Audio Error: File not found or blocked.", error);
                         alert("AUDIO ERROR: CHECK CONSOLE. ENSURE MP3s EXIST.");
                     });
                 }
@@ -449,13 +527,18 @@
 
         function setVolume(val) {
             audioPlayer.volume = val;
+            saveState();
         }
 
         function changeTrack(trackKey) {
             const wasPlaying = isPlaying;
-            audioPlayer.src = playlist[trackKey];
+            audioPlayer.src = playlist[trackKey] || audioPlayer.src;
+            saveState();
             if (wasPlaying) {
-                audioPlayer.play();
+                const playPromise = audioPlayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.catch(err => console.log('Track play error', err));
+                }
             }
         }
 
@@ -487,6 +570,9 @@
                         document.getElementById('btn-admin-nav').classList.remove('hidden');
                     }
                     initChart();
+
+                    // Apply persisted UI/actions after chart is ready
+                    applyPersistedState();
                 } else {
                     alert("OPERATOR REGISTERED. PLEASE INITIALIZE.");
                 }
@@ -699,6 +785,8 @@
 
             if(useFakeSensors) startFakeData();
             else stopFakeData();
+
+            saveState();
         }
 
         function initializeFakeFromThresholds() {
@@ -769,6 +857,9 @@
                 // update chart with a data-like object so existing chart code works
                 updateChart({ temp_in: fakeState.temp, soil_moisture: fakeState.soil });
             }, 1500); // every 1.5s
+
+            // persist
+            saveState();
         }
 
         function stopFakeData() {
@@ -787,6 +878,8 @@
                 document.getElementById('v-k').innerText = lastRealData.npk_k || "0";
                 updateChart(lastRealData);
             }
+
+            saveState();
         }
 
         // --- INITIALIZATION: keep code integrity ---
