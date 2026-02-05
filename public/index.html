@@ -42,13 +42,30 @@
         }
         .terminal-card h1 { font-family: 'Orbitron'; color: var(--acid-green); letter-spacing: 5px; margin-bottom: 30px; }
 
-        input {
+        input, select {
             width: 100%; box-sizing: border-box; background: rgba(0,0,0,0.5);
             border: 1px solid #333; padding: 15px; color: var(--cyber-blue);
             font-family: 'Rajdhani'; font-size: 1.1rem; margin-bottom: 10px;
             outline: none; transition: 0.3s;
         }
-        input:focus { border-color: var(--cyber-blue); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
+        input:focus, select:focus { border-color: var(--cyber-blue); box-shadow: 0 0 10px rgba(0, 242, 255, 0.2); }
+        
+        /* Custom Select Styling */
+        select { appearance: none; cursor: pointer; }
+        option { background: #111; color: var(--cyber-blue); }
+
+        /* --- CUSTOM SLIDER --- */
+        input[type=range] {
+            -webkit-appearance: none; width: 100%; background: transparent; padding: 0; margin: 10px 0;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none; height: 16px; width: 16px; border-radius: 50%;
+            background: var(--acid-green); cursor: pointer; margin-top: -6px;
+            box-shadow: 0 0 10px var(--acid-green);
+        }
+        input[type=range]::-webkit-slider-runnable-track {
+            width: 100%; height: 4px; cursor: pointer; background: #333; border-radius: 2px;
+        }
 
         /* --- NAVIGATION --- */
         nav {
@@ -80,7 +97,6 @@
             margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;
         }
         
-        /* Help Icon Styling */
         .help-icon {
             display: inline-flex; align-items: center; justify-content: center;
             width: 24px; height: 24px; border: 1px solid var(--cyber-blue);
@@ -102,7 +118,6 @@
         .cam-wrapper { width: 100%; background: #000; border-radius: 8px; overflow: hidden; position: relative; }
         #cam-feed { width: 100%; display: block; transform: rotate(180deg); transition: 0.3s; cursor: zoom-in; }
         
-        /* Fullscreen Camera Mode */
         .cam-overlay {
             position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
             background: rgba(0,0,0,0.95); z-index: 11000;
@@ -154,6 +169,8 @@
     </style>
 </head>
 <body>
+
+    <audio id="bgm-player" loop></audio>
 
     <div id="auth-screen">
         <div class="terminal-card">
@@ -244,6 +261,55 @@
             <div id="page-settings" class="hidden">
                 <div class="hud-card">
                     <div class="hud-header">
+                        AUDIO_SUBSYSTEM
+                        <span class="help-icon" onclick="showHelp('audio')">?</span>
+                    </div>
+                    <div class="toggle-row">
+                        <span>BGM_STATUS</span>
+                        <button id="btn-audio-toggle" class="btn-toggle" onclick="toggleAudio()">OFF</button>
+                    </div>
+                    <div class="toggle-row" style="flex-direction: column; align-items: flex-start;">
+                        <span style="margin-bottom:5px;">GAIN_LEVEL (VOL)</span>
+                        <input type="range" id="vol-slider" min="0" max="1" step="0.05" value="0.5" oninput="setVolume(this.value)">
+                    </div>
+                    <div class="toggle-row" style="flex-direction: column; align-items: flex-start; border-bottom: none;">
+                        <span style="margin-bottom:5px;">TRACK_SELECTOR (PvZ_OST_FULL)</span>
+                        <select id="track-select" onchange="changeTrack(this.value)">
+                            <option value="t01">01_CRAZY_DAVES_GREETING</option>
+                            <option value="t02">02_INTRO_THEME</option>
+                            <option value="t03">03_CHOOSE_YOUR_SEEDS</option>
+                            <option value="t04">04_GRASSWALK</option>
+                            <option value="t05">05_LOONBOON</option>
+                            <option value="t06">06_MOONGRAINS</option>
+                            <option value="t07">07_ZEN_GARDEN</option>
+                            <option value="t08">08_WATERY_GRAVES_SLOW</option>
+                            <option value="t09">09_WATERY_GRAVES_FAST</option>
+                            <option value="t10">10_ULTIMATE_BATTLE</option>
+                            <option value="t11">11_RIGOR_MORMIST</option>
+                            <option value="t12">12_CEREBRAWL</option>
+                            <option value="t13">13_GRAZE_THE_ROOF</option>
+                            <option value="t14">14_BRAINIAC_MANIAC</option>
+                            <option value="t15">15_ZOMBIES_ON_YOUR_LAWN</option>
+                            <option value="t16">16_ZOMBOTANY_UNRELEASED</option>
+                            <option value="t17">17_URANIWA_NI_ZOMBIES</option>
+                            <option value="t18">18_CRAZY_DAVE_INGAME</option>
+                            <option value="t19">19_CHOOSE_SEEDS_INGAME</option>
+                            <option value="t20">20_GRASSWALK_INGAME</option>
+                            <option value="t21">21_LOONBOON_INGAME</option>
+                            <option value="t22">22_MOONGRAINS_INGAME</option>
+                            <option value="t23">23_ZEN_GARDEN_INGAME</option>
+                            <option value="t24">24_WATERY_GRAVES_INGAME</option>
+                            <option value="t25">25_ULTIMATE_BATTLE_INGAME</option>
+                            <option value="t26">26_RIGOR_MORMIST_INGAME</option>
+                            <option value="t27">27_CEREBRAWL_INGAME</option>
+                            <option value="t28">28_GRAZE_THE_ROOF_INGAME</option>
+                            <option value="t29">29_BRAINIAC_MANIAC_INGAME</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="hud-card">
+                    <div class="hud-header">
                         SYSTEM_LOGIC_CONFIGURATION
                         <span class="help-icon" onclick="showHelp('settings')">?</span>
                     </div>
@@ -287,6 +353,82 @@
         const socket = io();
         let isAuto = true;
         let myRole = 'operator';
+
+        // --- AUDIO SYSTEM LOGIC ---
+        const audioPlayer = document.getElementById('bgm-player');
+        let isPlaying = false;
+
+        // --- FULL PVZ OST PLAYLIST ---
+        // PLEASE RENAME YOUR LOCAL FILES TO MATCH THESE EXACT NAMES:
+        const playlist = {
+            't01': 'music/01_crazy_daves_greeting.mp3',
+            't02': 'music/02_intro_theme.mp3',
+            't03': 'music/03_choose_your_seeds.mp3',
+            't04': 'music/04_grasswalk.mp3',
+            't05': 'music/05_loonboon.mp3',
+            't06': 'music/06_moongrains.mp3',
+            't07': 'music/07_zen_garden.mp3',
+            't08': 'music/08_watery_graves_slow.mp3',
+            't09': 'music/09_watery_graves_fast.mp3',
+            't10': 'music/10_ultimate_battle.mp3',
+            't11': 'music/11_rigor_mormist.mp3',
+            't12': 'music/12_cerebrawl.mp3',
+            't13': 'music/13_graze_the_roof.mp3',
+            't14': 'music/14_brainiac_maniac.mp3',
+            't15': 'music/15_zombies_on_your_lawn.mp3',
+            't16': 'music/16_zombotany_unreleased.mp3',
+            't17': 'music/17_uraniwa_ni_zombies.mp3',
+            't18': 'music/18_crazy_dave_ingame.mp3',
+            't19': 'music/19_choose_seeds_ingame.mp3',
+            't20': 'music/20_grasswalk_ingame.mp3',
+            't21': 'music/21_loonboon_ingame.mp3',
+            't22': 'music/22_moongrains_ingame.mp3',
+            't23': 'music/23_zen_garden_ingame.mp3',
+            't24': 'music/24_watery_graves_ingame.mp3',
+            't25': 'music/25_ultimate_battle_ingame.mp3',
+            't26': 'music/26_rigor_mormist_ingame.mp3',
+            't27': 'music/27_cerebrawl_ingame.mp3',
+            't28': 'music/28_graze_the_roof_ingame.mp3',
+            't29': 'music/29_brainiac_maniac_ingame.mp3'
+        };
+
+        // Initialize default track (Track 01)
+        audioPlayer.src = playlist['t01'];
+        audioPlayer.volume = 0.5;
+
+        function toggleAudio() {
+            const btn = document.getElementById('btn-audio-toggle');
+            if (isPlaying) {
+                audioPlayer.pause();
+                btn.innerText = "OFF";
+                btn.classList.remove('active');
+                isPlaying = false;
+            } else {
+                const playPromise = audioPlayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        btn.innerText = "ON";
+                        btn.classList.add('active');
+                        isPlaying = true;
+                    }).catch(error => {
+                        console.log("Audio Error: File not found or blocked.");
+                        alert("AUDIO ERROR: CHECK CONSOLE. ENSURE MP3s EXIST.");
+                    });
+                }
+            }
+        }
+
+        function setVolume(val) {
+            audioPlayer.volume = val;
+        }
+
+        function changeTrack(trackKey) {
+            const wasPlaying = isPlaying;
+            audioPlayer.src = playlist[trackKey];
+            if (wasPlaying) {
+                audioPlayer.play();
+            }
+        }
 
         // --- AUTH LOGIC ---
         async function handleAuth(type) {
@@ -338,6 +480,7 @@
             'home': "STATUS DASHBOARD:<br>Monitors live environment data. Includes real-time camera feed and NPK nutrient tracking. Data Export allows downloading Excel-ready CSV files.",
             'manual': "HARDWARE OVERRIDE:<br>Directly control relays (Pumps, Fans, Coolers). <br>NOTE: You MUST disable Automation in the Logic tab before controls become active.",
             'settings': "SYSTEM LOGIC:<br>Set the trigger points for automation. For example, if Temp > 28°C, the cooling system activates. NPK values determine nutrient dosing.",
+            'audio': "AUDIO SUBSYSTEM:<br>Controls background music playback. Ensure all 29 PvZ MP3 files are in the root directory.",
             'admin': "ADMIN PANEL:<br>Manage user access. Promote operators to Admins, ban bad actors, or delete accounts entirely."
         };
 
